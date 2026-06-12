@@ -32,6 +32,37 @@ export function registerIPCHandlers(ctx: IPCContext): void {
     }
   });
 
+  // AI 对话（流式）
+  ipcMain.handle('ai:sendMessage', async (event, text: string, imageBase64?: string) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win) return '';
+
+    try {
+      // 动态导入 AI service（避免启动时加载）
+      const { sendVisionMessage } = await import('../ai/service');
+      const { createContext } = await import('../ai/context');
+
+      const ctx = createContext(''); // TODO: 注入用户画像
+      let fullResponse = '';
+
+      for await (const token of sendVisionMessage(text, imageBase64 || undefined, ctx)) {
+        fullResponse += token;
+        // 每个 token 推送给渲染进程
+        win.webContents.send('ai:streamToken', token);
+      }
+
+      win.webContents.send('ai:streamEnd');
+      return fullResponse;
+    } catch (err: any) {
+      logger.error('AI handler error', { message: err.message, code: err.code });
+      win.webContents.send('ai:streamError', {
+        code: err.code || 'UNKNOWN',
+        message: err.message || '未知错误',
+      });
+      return '';
+    }
+  });
+
   // TODO: AI 对话处理器（Day 1 下午）
   // ipcMain.handle('ai:sendMessage', async (_, text: string, imageBase64?: string) => { ... });
 

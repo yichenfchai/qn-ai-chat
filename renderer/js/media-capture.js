@@ -1,15 +1,166 @@
-const MediaCapture={_videoEl:null,_canvasEl:null,_stream:null,_cameraActive:!1,_audioContext:null,_analyser:null,_micStream:null,_vadInterval:null,_isSpeaking:!1,_speakingTimer:null,_vadThreshold:.02,_vadHoldMs:300,_recognition:null,_recognitionActive:!1,_finalTranscript:"",
-init(){this._videoEl=document.createElement("video");this._videoEl.setAttribute("playsinline","");this._videoEl.setAttribute("autoplay","");this._videoEl.style.display="none";document.body.appendChild(this._videoEl);this._canvasEl=document.createElement("canvas");this._canvasEl.width=640;this._canvasEl.height=480;this._canvasEl.style.display="none";document.body.appendChild(this._canvasEl);this._initSTT()},
-_initSTT(){const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){console.warn("[MC] STT not supported");return}this._recognition=new SR();this._recognition.lang="zh-CN";this._recognition.interimResults=!0;this._recognition.continuous=!0;this._recognition.maxAlternatives=1},
-async startCamera(){if(this._cameraActive)return!0;try{this._stream=await navigator.mediaDevices.getUserMedia({video:{width:{ideal:640},height:{ideal:480},facingMode:"user"},audio:!1});this._videoEl.srcObject=this._stream;await this._videoEl.play();this._cameraActive=!0;return!0}catch(e){throw e}},
-stopCamera(){if(this._stream){this._stream.getTracks().forEach(t=>t.stop());this._stream=null}this._videoEl.srcObject=null;this._cameraActive=!1},
-captureFrame(){if(!this._cameraActive||!this._videoEl||!this._canvasEl)return null;try{const ctx=this._canvasEl.getContext("2d");const vw=this._videoEl.videoWidth,vh=this._videoEl.videoHeight;if(!vw||!vh)return null;const scale=Math.min(640/vw,480/vh),dw=vw*scale,dh=vh*scale,dx=(640-dw)/2,dy=(480-dh)/2;ctx.fillStyle="#000";ctx.fillRect(0,0,640,480);ctx.drawImage(this._videoEl,dx,dy,dw,dh);const du=this._canvasEl.toDataURL("image/jpeg",.6);return du.split(",")[1]||null}catch(e){return null}},
-async startMicrophone(){if(this._audioContext)return!0;try{this._micStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:!0,noiseSuppression:!0,autoGainControl:!0},video:!1});this._audioContext=new(window.AudioContext||window.webkitAudioContext);const src=this._audioContext.createMediaStreamSource(this._micStream);this._analyser=this._audioContext.createAnalyser();this._analyser.fftSize=256;this._analyser.smoothingTimeConstant=.5;src.connect(this._analyser);return!0}catch(e){throw e}},
-stopMicrophone(){this.stopVAD();if(this._audioContext){this._audioContext.close();this._audioContext=null;this._analyser=null}if(this._micStream){this._micStream.getTracks().forEach(t=>t.stop());this._micStream=null}},
-startVAD(onStart,onEnd){if(!this._analyser)return;const da=new Float32Array(this._analyser.fftSize);let acc=0;this._vadInterval=setInterval(()=>{this._analyser.getFloatTimeDomainData(da);let ss=0;for(let i=0;i<da.length;i++)ss+=da[i]*da[i];const rms=Math.sqrt(ss/da.length),sp=rms>this._vadThreshold;if(sp&&!this._isSpeaking){acc+=50;if(acc>=this._vadHoldMs){this._isSpeaking=!0;acc=0;if(onStart)onStart()}}else if(!sp&&this._isSpeaking){if(!this._speakingTimer){this._speakingTimer=setTimeout(()=>{this._isSpeaking=!1;acc=0;this._speakingTimer=null;if(onEnd)onEnd()},500)}}else if(sp){if(this._speakingTimer){clearTimeout(this._speakingTimer);this._speakingTimer=null}}else acc=0},50)},
-stopVAD(){if(this._vadInterval){clearInterval(this._vadInterval);this._vadInterval=null}if(this._speakingTimer){clearTimeout(this._speakingTimer);this._speakingTimer=null}this._isSpeaking=!1},
-startRecognition(onInterim,onFinal){if(!this._recognition||this._recognitionActive)return!!this._recognition;this._finalTranscript="";this._recognition.onresult=e=>{let im="";for(let i=e.resultIndex;i<e.results.length;i++){const t=e.results[i][0].transcript;e.results[i].isFinal?(this._finalTranscript+=t):im+=t}if(im&&onInterim)onInterim(this._finalTranscript+im);if(this._finalTranscript&&onFinal){onFinal(this._finalTranscript);this._finalTranscript=""}};this._recognition.onerror=e=>{if(e.error!=="no-speech")errorBoundary.handleError(new Error("STT: "+e.error),"stt")};this._recognition.onend=()=>{if(this._recognitionActive&&this._recognition)try{this._recognition.start()}catch(_){}};try{this._recognition.start();this._recognitionActive=!0;return!0}catch(e){return!1}},
-stopRecognition(){if(this._recognition&&this._recognitionActive){try{this._recognition.stop()}catch(_){}this._recognitionActive=!1}return this._finalTranscript||null},
-stopAll(){this.stopCamera();this.stopMicrophone();this.stopRecognition()},
-checkSupport(){const issues=[];if(!navigator.mediaDevices?.getUserMedia)issues.push("摄像头/麦克风");const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR)issues.push("语音识别");if(!window.speechSynthesis)issues.push("语音合成");return{supported:issues.length===0,issues}}
-};
+/**
+ * 媒体采集模块 — 摄像头 + 麦克风 + STT
+ * 
+ * 数据流:
+ *   摄像头: <video>静默播放 → Canvas抓帧 → JPEG base64
+ *   麦克风: Web Speech API → 转录文本
+ */
+
+class MediaCapture {
+  constructor() {
+    this.video = null;
+    this.canvas = null;
+    this.stream = null;
+    this.recognition = null;
+    this.transcript = '';
+    this.isListening = false;
+    this.onTranscriptReady = null;
+  }
+
+  /** 初始化摄像头（创建隐藏的video+canvas） */
+  async initCamera() {
+    this.video = document.createElement('video');
+    this.video.style.display = 'none';
+    this.video.setAttribute('playsinline', '');
+    this.video.setAttribute('autoplay', '');
+    document.body.appendChild(this.video);
+
+    this.canvas = document.createElement('canvas');
+    this.canvas.width = 640;
+    this.canvas.height = 480;
+  }
+
+  /** 打开摄像头 */
+  async startCamera() {
+    if (!this.video) await this.initCamera();
+
+    try {
+      this.stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          width: { ideal: 640 },
+          height: { ideal: 480 },
+          facingMode: 'user',
+        },
+        audio: false,
+      });
+      this.video.srcObject = this.stream;
+      await this.video.play();
+      console.log('[Media] Camera started');
+      return true;
+    } catch (err) {
+      console.error('[Media] Camera error:', err);
+      if (err.name === 'NotAllowedError') {
+        stateMachine?.transition('error', { message: '摄像头权限被拒绝喵...' });
+      } else if (err.name === 'NotFoundError') {
+        stateMachine?.transition('error', { message: '没有找到摄像头喵...' });
+      }
+      return false;
+    }
+  }
+
+  /** 抓取当前帧 → JPEG base64 */
+  captureFrame() {
+    if (!this.video || !this.canvas || !this.stream) return null;
+
+    const ctx = this.canvas.getContext('2d');
+    if (!ctx) return null;
+
+    ctx.drawImage(this.video, 0, 0, 640, 480);
+    return this.canvas.toDataURL('image/jpeg', 0.6);
+  }
+
+  /** 关闭摄像头 */
+  stopCamera() {
+    if (this.stream) {
+      this.stream.getTracks().forEach(t => t.stop());
+      this.stream = null;
+      console.log('[Media] Camera stopped');
+    }
+  }
+
+  /** 初始化语音识别 */
+  initSpeechRecognition() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      console.warn('[Media] SpeechRecognition not available');
+      return false;
+    }
+
+    this.recognition = new SpeechRecognition();
+    this.recognition.lang = 'zh-CN';
+    this.recognition.continuous = true;    // 持续识别
+    this.recognition.interimResults = true; // 显示临时结果
+
+    this.recognition.onresult = (event) => {
+      let interim = '';
+      let final = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        if (event.results[i].isFinal) {
+          final += event.results[i][0].transcript;
+        } else {
+          interim += event.results[i][0].transcript;
+        }
+      }
+      if (final) this.transcript = final;
+    };
+
+    this.recognition.onerror = (event) => {
+      console.error('[Media] STT error:', event.error);
+      if (event.error === 'not-allowed') {
+        stateMachine?.transition('error', { message: '麦克风权限被拒绝喵...' });
+      }
+    };
+
+    this.recognition.onend = () => {
+      console.log('[Media] STT ended, transcript:', this.transcript);
+      if (this.onTranscriptReady && this.transcript) {
+        this.onTranscriptReady(this.transcript);
+      }
+      this.isListening = false;
+    };
+
+    return true;
+  }
+
+  /** 开始听（按住空格时调用） */
+  startListening() {
+    if (!this.recognition) {
+      if (!this.initSpeechRecognition()) {
+        // 无 STT 能力，退回手动输入
+        console.warn('[Media] No STT, using placeholder');
+        return;
+      }
+    }
+
+    this.transcript = '';
+    this.isListening = true;
+    try {
+      this.recognition.start();
+      console.log('[Media] Listening...');
+    } catch (err) {
+      console.warn('[Media] STT start error:', err);
+    }
+  }
+
+  /** 停止听（松开空格时调用） */
+  stopListening() {
+    if (!this.isListening) return;
+    try {
+      this.recognition.stop();
+    } catch (err) {
+      console.warn('[Media] STT stop error:', err);
+    }
+    this.isListening = false;
+  }
+
+  /** 手动设置文字（STT不可用时） */
+  setManualText(text) {
+    this.transcript = text;
+    if (this.onTranscriptReady) {
+      this.onTranscriptReady(text);
+    }
+  }
+}
+
+// 全局实例
+const mediaCapture = new MediaCapture();

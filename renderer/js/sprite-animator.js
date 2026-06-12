@@ -6,7 +6,7 @@
  */
 
 const SPRITES = {
-  idle: ['sprites/w1.png', 'sprites/w2.png', 'sprites/w3.png'],
+  idle: ['sprites/cat.png'],
 };
 
 // 帧循环已禁用 — 仅保持 w1 静态站立
