@@ -61,8 +61,8 @@ window.addEventListener('error', (e) => {
 
       if (stateMachine.state !== 'listening') return;
 
-      // 停止语音识别
-      mediaCapture.stopListening();
+      // 停止语音识别（等待结果）
+      await mediaCapture.stopListening();
 
       // 抓取摄像头帧
       const frame = mediaCapture.captureFrame();

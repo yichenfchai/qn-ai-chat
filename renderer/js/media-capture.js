@@ -78,6 +78,7 @@ class MediaCapture {
     this.recognition.continuous = true;
     this.recognition.interimResults = true;
     this.transcript = '';
+    this._sttResolve = null;
 
     this.recognition.onresult = (event) => {
       for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -85,15 +86,24 @@ class MediaCapture {
           this.transcript += event.results[i][0].transcript;
         }
       }
+      console.log('STT interim:', this.transcript);
     };
 
     this.recognition.onerror = (event) => {
       console.log('STT error:', event.error);
+      if (this._sttResolve) {
+        this._sttResolve();
+        this._sttResolve = null;
+      }
     };
 
     this.recognition.onend = () => {
       console.log('STT ended, transcript:', this.transcript);
       this.isListening = false;
+      if (this._sttResolve) {
+        this._sttResolve();
+        this._sttResolve = null;
+      }
     };
 
     try {
@@ -105,14 +115,25 @@ class MediaCapture {
     }
   }
 
-  stopListening() {
+  /** 停止并等待识别结果（修复异步竞态） */
+  async stopListening() {
     if (!this.isListening || !this.recognition) return;
+    
+    const promise = new Promise((resolve) => {
+      this._sttResolve = resolve;
+      // 兜底：2秒后强制 resolve
+      setTimeout(resolve, 2000);
+    });
+
     try {
       this.recognition.stop();
     } catch (err) {
       console.log('STT stop error:', err);
     }
+
+    await promise;
     this.isListening = false;
+    console.log('STT final transcript:', this.transcript);
   }
 }
 
