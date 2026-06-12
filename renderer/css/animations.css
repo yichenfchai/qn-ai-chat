@@ -1,0 +1,72 @@
+/* ============================================
+   PixelCat — 动画关键帧补充
+   ============================================ */
+
+/* 窗口入场动画 */
+@keyframes window-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.8) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+#cat-container {
+  animation: window-enter 0.5s ease-out;
+}
+
+/* 状态切换过渡 */
+#cat {
+  transition: filter 0.3s ease;
+}
+
+/* 错误状态闪红 */
+#cat.error-state {
+  filter: drop-shadow(0 0 8px rgba(255, 0, 0, 0.5));
+  animation: cat-float 1s ease-in-out infinite;
+}
+
+/* 执行中状态 */
+#cat.executing .cat-paw {
+  animation: paw-tap 0.2s ease-in-out infinite;
+}
+
+#cat.executing .cat-paw.right {
+  animation-delay: 0.1s;
+}
+
+/* 气泡出现动画 */
+#speech-bubble.visible {
+  animation: bubble-pop 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+@keyframes bubble-pop {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) scale(0.8) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) scale(1) translateY(0);
+  }
+}
+
+/* 文本逐字显示效果（可选） */
+.typewriter {
+  overflow: hidden;
+  border-right: 2px solid rgba(255, 255, 255, 0.5);
+  white-space: nowrap;
+  animation: typing 0.5s steps(10) forwards, blink 0.75s step-end infinite;
+}
+
+@keyframes typing {
+  from { width: 0; }
+  to   { width: 100%; }
+}
+
+@keyframes blink {
+  50% { border-color: transparent; }
+}

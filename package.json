@@ -1,0 +1,29 @@
+{
+  "name": "pixelcat",
+  "version": "1.0.0",
+  "description": "AI\u684c\u9762\u5ba0\u7269 - \u50cf\u7d20\u732bAgent\uff0c\u591a\u6a21\u6001\u5bf9\u8bdd + \u6587\u4ef6\u64cd\u4f5c + \u7528\u6237\u753b\u50cf",
+  "main": "dist/main/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "npm run build && electron .",
+    "dev": "tsc && electron .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src/ --ext .ts",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.0"
+  },
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.0.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.0",
+    "eslint": "^8.56.0",
+    "@typescript-eslint/parser": "^6.19.0",
+    "@typescript-eslint/eslint-plugin": "^6.19.0",
+    "@types/node": "^20.11.0"
+  }
+}

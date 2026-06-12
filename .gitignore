@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.env
+*.db
+*.db-journal
+out/
+release/
+.vite/
+*.tsbuildinfo
+.DS_Store
+Thumbs.db

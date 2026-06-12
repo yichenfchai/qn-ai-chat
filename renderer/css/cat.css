@@ -1,0 +1,356 @@
+/* ============================================
+   PixelCat — 纯 CSS 像素猫
+   坐标系：cat-container 320x420
+   ============================================ */
+
+/* 猫的整体容器 */
+#cat {
+  --cat-scale: 1;
+  position: relative;
+  width: 200px;
+  height: 280px;
+  transform: scale(var(--cat-scale));
+  transform-origin: center center;
+  /* 悬挂动画 */
+  animation: cat-float 3s ease-in-out infinite;
+}
+
+/* ===== 耳朵 ===== */
+.cat-ear {
+  position: absolute;
+  width: 0;
+  height: 0;
+  border-left: 18px solid transparent;
+  border-right: 18px solid transparent;
+  border-bottom: 35px solid #ff8c42;
+  transition: transform 0.3s ease;
+}
+
+.cat-ear.left {
+  top: 8px;
+  left: 42px;
+  transform: rotate(-15deg);
+}
+
+.cat-ear.right {
+  top: 8px;
+  right: 42px;
+  transform: rotate(15deg);
+}
+
+/* 耳朵内侧 */
+.cat-ear::after {
+  content: '';
+  position: absolute;
+  top: 8px;
+  left: -12px;
+  width: 0;
+  height: 0;
+  border-left: 10px solid transparent;
+  border-right: 10px solid transparent;
+  border-bottom: 22px solid #ffb087;
+}
+
+/* 倾听时耳朵前倾 */
+#cat.listening .cat-ear.left  { transform: rotate(-25deg) translateX(-3px); }
+#cat.listening .cat-ear.right { transform: rotate(25deg) translateX(3px); }
+
+/* ===== 头部 ===== */
+.cat-head {
+  position: absolute;
+  top: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 120px;
+  height: 100px;
+  background: #ff8c42;
+  border-radius: 60px 60px 50px 50px;
+  /* 脸上的花纹 */
+  box-shadow: 
+    inset 0 0 0 3px rgba(255, 140, 66, 0.3),
+    0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* 脸部白色区域 */
+.cat-face {
+  position: absolute;
+  top: 35px;
+  left: 15px;
+  right: 15px;
+  bottom: 5px;
+  background: #fff3e0;
+  border-radius: 40px 40px 35px 35px;
+}
+
+/* ===== 眼睛 ===== */
+.cat-eye {
+  position: absolute;
+  top: 48px;
+  width: 28px;
+  height: 30px;
+  background: #fff;
+  border-radius: 50%;
+  border: 3px solid #5d4037;
+  overflow: hidden;
+}
+
+.cat-eye.left  { left: 22px; }
+.cat-eye.right { right: 22px; }
+
+/* 瞳孔 */
+.cat-pupil {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 16px;
+  height: 20px;
+  background: #2d2d2d;
+  border-radius: 50%;
+  transition: width 0.1s ease;
+}
+
+/* 瞳孔高光 */
+.cat-pupil::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 4px;
+  width: 5px;
+  height: 5px;
+  background: #fff;
+  border-radius: 50%;
+}
+
+/* 眨眼动画 */
+#cat.blinking .cat-eye {
+  height: 4px;
+  margin-top: 13px;
+  transition: all 0.05s ease;
+}
+
+/* 闭眼状态（睡觉） */
+#cat.sleeping .cat-eye {
+  height: 3px;
+  margin-top: 13px;
+}
+
+/* 思考时眼睛转圈 */
+#cat.thinking .cat-pupil {
+  width: 12px;
+  animation: eye-roll 0.8s ease-in-out infinite;
+}
+
+@keyframes eye-roll {
+  0%, 100% { border-radius: 50%; }
+  50%      { border-radius: 5px; }
+}
+
+/* ===== 嘴巴 ===== */
+.cat-mouth {
+  position: absolute;
+  top: 75px;
+  left: 50%;
+  transform: translateX(-50%);
+  transition: all 0.3s ease;
+}
+
+/* 开心嘴巴 ω */
+.cat-mouth.happy {
+  width: 30px;
+  height: 15px;
+  border-bottom: 3px solid #5d4037;
+  border-radius: 0 0 20px 20px;
+}
+
+/* 好奇嘴巴 △ */
+.cat-mouth.curious {
+  width: 12px;
+  height: 12px;
+  background: #5d4037;
+  border-radius: 50%;
+}
+
+/* 说话嘴巴 */
+.cat-mouth.speaking {
+  width: 18px;
+  height: 12px;
+  background: #5d4037;
+  border-radius: 50%;
+  animation: mouth-talk 0.3s ease-in-out infinite;
+}
+
+@keyframes mouth-talk {
+  0%, 100% { height: 8px; width: 14px; }
+  50%      { height: 18px; width: 22px; }
+}
+
+/* 无聊嘴巴 — */
+.cat-mouth.bored {
+  width: 20px;
+  height: 3px;
+  background: #5d4037;
+  border-radius: 2px;
+}
+
+/* 睡觉嘴巴 ⌒  */
+.cat-mouth.sleepy {
+  width: 14px;
+  height: 7px;
+  border-top: 3px solid #5d4037;
+  border-radius: 10px 10px 0 0;
+  background: transparent;
+}
+
+/* ===== 胡须 ===== */
+.cat-whisker {
+  position: absolute;
+  top: 72px;
+  height: 2px;
+  background: rgba(93, 64, 55, 0.4);
+  border-radius: 1px;
+}
+
+.cat-whisker.l1 { left: 5px;  width: 30px; transform: rotate(-5deg);  top: 70px; }
+.cat-whisker.l2 { left: 8px;  width: 26px; transform: rotate(2deg);   top: 74px; }
+.cat-whisker.r1 { right: 5px; width: 30px; transform: rotate(5deg);   top: 70px; }
+.cat-whisker.r2 { right: 8px; width: 26px; transform: rotate(-2deg);  top: 74px; }
+
+/* ===== 身体 ===== */
+.cat-body {
+  position: absolute;
+  top: 115px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100px;
+  height: 85px;
+  background: #ff8c42;
+  border-radius: 45px 45px 40px 40px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* 肚皮白色 */
+.cat-belly {
+  position: absolute;
+  bottom: 5px;
+  left: 15px;
+  right: 15px;
+  height: 45px;
+  background: #fff3e0;
+  border-radius: 0 0 30px 30px;
+}
+
+/* ===== 前爪 ===== */
+.cat-paw {
+  position: absolute;
+  top: 185px;
+  width: 35px;
+  height: 30px;
+  background: #ff8c42;
+  border-radius: 15px;
+}
+
+.cat-paw.left  { left: 40px; }
+.cat-paw.right { right: 40px; }
+
+/* 爪垫 */
+.cat-paw::after {
+  content: '';
+  position: absolute;
+  bottom: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 18px;
+  height: 12px;
+  background: #ffb087;
+  border-radius: 8px;
+}
+
+/* 打字动画时爪子交替 */
+#cat.typing .cat-paw.left  { animation: paw-tap 0.4s ease-in-out infinite; }
+#cat.typing .cat-paw.right { animation: paw-tap 0.4s ease-in-out 0.2s infinite; }
+
+@keyframes paw-tap {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-5px); }
+}
+
+/* ===== 尾巴 ===== */
+.cat-tail {
+  position: absolute;
+  top: 155px;
+  right: 10px;
+  width: 50px;
+  height: 14px;
+  background: #ff8c42;
+  border-radius: 7px;
+  transform-origin: left center;
+  animation: tail-wag 2s ease-in-out infinite;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+@keyframes tail-wag {
+  0%, 100% { transform: rotate(-15deg); }
+  50%      { transform: rotate(20deg); }
+}
+
+/* 思考时尾巴不动 */
+#cat.thinking .cat-tail {
+  animation-play-state: paused;
+  transform: rotate(10deg);
+}
+
+/* ===== 身体动画 ===== */
+@keyframes cat-float {
+  0%, 100% { transform: scale(var(--cat-scale)) translateY(0); }
+  50%      { transform: scale(var(--cat-scale)) translateY(-4px); }
+}
+
+/* 开心时跳起来 */
+#cat.excited {
+  animation: cat-bounce 0.5s ease-in-out;
+}
+
+@keyframes cat-bounce {
+  0%   { transform: scale(var(--cat-scale)) translateY(0); }
+  30%  { transform: scale(var(--cat-scale)) translateY(-20px); }
+  50%  { transform: scale(var(--cat-scale)) translateY(0); }
+  70%  { transform: scale(var(--cat-scale)) translateY(-10px); }
+  100% { transform: scale(var(--cat-scale)) translateY(0); }
+}
+
+/* 惊讶时身体后仰 */
+#cat.surprised {
+  transform: scale(var(--cat-scale)) rotate(-5deg);
+}
+
+/* Zzz 飘出 */
+.zzz {
+  position: absolute;
+  top: 10px;
+  right: 30px;
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.6);
+  font-family: 'Comic Sans MS', cursive;
+  pointer-events: none;
+  opacity: 0;
+}
+
+#cat.sleeping .zzz {
+  opacity: 1;
+  animation: zzz-float 2s ease-out infinite;
+}
+
+.zzz:nth-child(1) { animation-delay: 0s; }
+.zzz:nth-child(2) { animation-delay: 0.5s; font-size: 14px; }
+.zzz:nth-child(3) { animation-delay: 1s; font-size: 11px; }
+
+@keyframes zzz-float {
+  0%   { transform: translateY(0) scale(1); opacity: 0.6; }
+  100% { transform: translateY(-30px) scale(1.5); opacity: 0; }
+}
+
+/* ===== 响应式缩放 ===== */
+@media (max-width: 300px) {
+  #cat { --cat-scale: 0.8; }
+}

@@ -1,0 +1,6 @@
+class ErrorBoundary{constructor(){this.errorCount=0;this.lastErrorTime=0;this.toastTimeout=null;this.init()}
+init(){window.addEventListener("error",e=>{this.handleError(e.error||e.message,"js")});window.addEventListener("unhandledrejection",e=>{this.handleError(e.reason,"promise");e.preventDefault()})}
+handleError(err,src="unknown"){this.errorCount++;const msg=err instanceof Error?err.message:String(err);console.error("[EB]["+src+"]",msg);const now=Date.now();if(now-this.lastErrorTime<1000)return;this.lastErrorTime=now;this.showToast(this.formatMsg(msg))}
+formatMsg(msg){const m=[{p:/NotAllowedError/i,r:"权限被拒绝，请在系统设置中允许摄像头/麦克风"},{p:/NotFoundError/i,r:"未找到摄像头或麦克风设备"},{p:/NotReadableError/i,r:"摄像头/麦克风被其他应用占用"},{p:/timeout/i,r:"操作超时，请稍后重试"},{p:/network|fetch/i,r:"网络连接失败"}];for(const{p,r}of m)if(p.test(msg))return r;return msg.length>100?msg.slice(0,97)+"...":msg}
+showToast(msg){const t=document.getElementById("error-toast"),m=document.getElementById("error-message");if(!t||!m)return;if(this.toastTimeout){clearTimeout(this.toastTimeout);t.classList.add("hidden")}m.textContent=msg;t.classList.remove("hidden");this.toastTimeout=setTimeout(()=>{t.classList.add("hidden");this.toastTimeout=null},4000)}}
+const errorBoundary=new ErrorBoundary();
