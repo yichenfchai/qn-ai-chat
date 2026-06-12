@@ -6,7 +6,7 @@
  */
 
 const SPRITES = {
-  idle: ['sprites/w1.png', 'sprites/w2.png', 'sprites/w3.png'],
+  idle: ['sprites/cat.png'],
 };
 
 // 帧循环已禁用 — 仅保持 w1 静态站立
@@ -33,7 +33,7 @@ function updateCatExpression(expression) {
   if (cls) pet.classList.add(cls);
 
   // 统一使用 w1 精灵图（暂不切换）
-  if (img) img.src = SPRITES.idle[0];
+  if (img) img.src = SPRITES.idle[0];  // 统一使用 cat.png
 
   // 控制 Zzz
   showZZZ(expression === 'sleeping');
