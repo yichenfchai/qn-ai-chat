@@ -1,165 +1,76 @@
 /**
- * AI 服务 — 多模态流式调用
- * 
- * 支持 OpenAI 兼容 API（DeepSeek/Qwen-VL/GPT-4o 等）
- * 通过 .env 配置 AI_BASE_URL / AI_MODEL / AI_API_KEY
+ * AI 服务 — Qwen-Omni 多模态调用
+ * 支持音频+图片+文字一次性输入
  */
 
 import { getConfig } from '../main/infra/config';
 import { createLogger } from '../main/infra/logger';
 import { makeError } from '../main/infra/errors';
-import type { VisionMessage, ChatCompletionChunk, VisionContent } from './types';
+import { getEffectiveSettings } from '../main/settings-store';
 import { buildContext, type ConversationContext } from './context';
 
 const logger = createLogger('ai-service');
 
-/** 解析 SSE 流 */
-async function* parseSSE(body: ReadableStream<Uint8Array>): AsyncGenerator<ChatCompletionChunk> {
-  const reader = body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
-
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed || !trimmed.startsWith('data: ')) continue;
-
-        const data = trimmed.slice(6);
-        if (data === '[DONE]') return;
-
-        try {
-          const chunk: ChatCompletionChunk = JSON.parse(data);
-          yield chunk;
-        } catch {
-          // 跳过解析失败的行
-        }
-      }
-    }
-  } finally {
-    reader.releaseLock();
-  }
-}
-
-/** 发送多模态消息（流式） */
-export async function* sendVisionMessage(
+export async function* sendOmniMessage(
   text: string,
+  audioBase64: string | undefined,
   imageBase64: string | undefined,
   ctx: ConversationContext,
 ): AsyncGenerator<string> {
-  const config = getConfig();
-  // 优先使用 settings.json（用户右击设置面板保存的），其次 .env
-  const { getEffectiveSettings } = await import('../main/settings-store');
   const eff = getEffectiveSettings();
-  const baseURL = eff.baseUrl || 'https://dashscope.aliyuncs.com/compatible-mode/v1';
-  const model = eff.model || 'qwen-vl-max';
-  const apiKey = eff.apiKey || process.env.AI_API_KEY || config.DEEPSEEK_API_KEY;
+  const apiKey = eff.apiKey || process.env.AI_API_KEY || getConfig().DEEPSEEK_API_KEY;
 
-  // 构建消息
   const messages = buildContext(ctx);
 
-  // 当前用户消息（文本 + 可选图片）
-  const userContent: VisionContent[] = [];
+  // 构建多模态内容
+  const content: any[] = [{ text: text || '（用户没有说话，请根据画面回复）' }];
 
   if (imageBase64) {
-    userContent.push({
-      type: 'image_url',
-      image_url: { url: imageBase64, detail: 'low' },
-    });
+    content.push({ image: imageBase64 });
+  }
+  if (audioBase64) {
+    content.push({ audio: audioBase64 });
   }
 
-  userContent.push({
-    type: 'text',
-    text: imageBase64
-      ? `（用户对着摄像头说）${text}`
-      : text,
-  });
+  const userMsg = { role: 'user', content };
+  const allMessages = [...messages, userMsg];
 
-  const userMessage: VisionMessage = {
-    role: 'user',
-    content: userContent,
-  };
-
-  const allMessages = [
-    ...messages.map(m => ({ role: m.role, content: m.content } as VisionMessage)),
-    userMessage,
-  ];
-
-  logger.info('AI request', {
-    model,
-    messagesCount: allMessages.length,
+  logger.info('Omni request', {
     hasImage: !!imageBase64,
-    imageSize: imageBase64 ? Math.round(imageBase64.length / 1024) + 'KB' : 'N/A',
+    hasAudio: !!audioBase64,
+    audioSize: audioBase64 ? Math.round(audioBase64.length / 1024) + 'KB' : 'N/A',
   });
 
-  // 发送请求
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 30000); // 30s 超时
-
-  try {
-    const response = await fetch(`${baseURL}/chat/completions`, {
+  const resp = await fetch(
+    'https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation',
+    {
       method: 'POST',
       headers: {
+        'Authorization': 'Bearer ' + apiKey,
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model,
-        messages: allMessages,
-        stream: true,
-        max_tokens: config.MAX_TOKENS,
-        temperature: config.TEMPERATURE,
+        model: 'qwen-omni-turbo',
+        input: { messages: allMessages },
+        parameters: { max_tokens: 2048 },
       }),
-      signal: controller.signal,
-    });
+      signal: AbortSignal.timeout(30000),
+    },
+  );
 
-    if (!response.ok) {
-      const errText = await response.text().catch(() => '');
-      logger.error('AI API error', { status: response.status, body: errText.slice(0, 200) });
+  if (!resp.ok) {
+    const errText = await resp.text().catch(() => '');
+    logger.error('Omni error', { status: resp.status, body: errText.slice(0, 200) });
+    if (resp.status === 401) throw makeError('AI_INVALID_KEY');
+    throw makeError('AI_MODEL_ERROR', { status: resp.status });
+  }
 
-      if (response.status === 401 || response.status === 403) {
-        throw makeError('AI_INVALID_KEY');
-      } else if (response.status === 429) {
-        throw makeError('AI_RATE_LIMIT');
-      } else {
-        throw makeError('AI_MODEL_ERROR', { status: response.status, body: errText });
-      }
-    }
+  const data = await resp.json();
+  const reply = data?.output?.choices?.[0]?.message?.content?.[0]?.text || '';
 
-    if (!response.body) {
-      throw makeError('AI_EMPTY_RESP');
-    }
-
-    let tokenCount = 0;
-    for await (const chunk of parseSSE(response.body)) {
-      const content = chunk.choices?.[0]?.delta?.content;
-      if (content) {
-        tokenCount++;
-        yield content;
-      }
-    }
-
-    logger.info('AI response complete', { tokenCount });
-  } catch (err: any) {
-    if (err.name === 'AbortError') {
-      throw makeError('AI_TIMEOUT');
-    }
-    // 如果已经是 AppError，直接抛
-    if (err.code && err.recoverable !== undefined) {
-      throw err;
-    }
-    // 网络错误
-    logger.error('AI request failed', { message: err.message });
-    throw makeError('NETWORK_ERROR', { detail: err.message });
-  } finally {
-    clearTimeout(timeout);
+  if (reply) {
+    yield reply;
+  } else {
+    throw makeError('AI_EMPTY_RESP');
   }
 }
-

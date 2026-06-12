@@ -1,51 +1,62 @@
 /**
  * Preload 脚本 — contextBridge 安全桥接
- * 
- * ⚠️ 这是 Main ↔ Renderer 的唯一通信通道
- * 只暴露白名单 API，Renderer 无法直接访问 Node.js
  */
 
 import { contextBridge, ipcRenderer } from 'electron';
 
-/** 暴露给渲染进程的 API */
+/** 暴露给渲染进程的 API — 使用 send/on 替代 invoke（Electron bug workaround） */
 const pixelcatAPI = {
-  /** 健康检查 */
   ping: (): Promise<{ pong: boolean; ts: number }> =>
-    ipcRenderer.invoke('ping'),
+    new Promise((resolve) => {
+      const channel = 'ping-' + Date.now();
+      ipcRenderer.once(channel, (_event, result) => resolve(result));
+      ipcRenderer.send('ping', channel);
+    }),
 
-  /** 设置读写 */
-  getSettings: (): Promise<any> => ipcRenderer.invoke('settings:get'),
-  saveSettings: (settings: any): Promise<boolean> => ipcRenderer.invoke('settings:save', settings),
-
-  /** NLS Token */
-  getNLSToken: (): Promise<{ appKey: string; url: string }> =>
-    ipcRenderer.invoke('nls:getToken'),
-
-  /** AI 对话（流式）*/
-  sendMessage: (text: string, imageBase64?: string): Promise<string> =>
-    ipcRenderer.invoke('ai:sendMessage', text, imageBase64),
-
-  /** 监听流式 token */
-  onStreamToken: (callback: (token: string) => void): void => {
-    ipcRenderer.on('ai:streamToken', (_event, token: string) => callback(token));
-  },
-
-  /** 监听流结束 */
-  onStreamEnd: (callback: () => void): void => {
-    ipcRenderer.on('ai:streamEnd', () => callback());
-  },
-
-  /** 监听流错误 */
-  onStreamError: (callback: (error: { code: string; message: string }) => void): void => {
-    ipcRenderer.on('ai:streamError', (_event, error) => callback(error));
-  },
-
-  /** 拖拽移动窗口 */
   moveWindow: (dx: number, dy: number): void => {
     ipcRenderer.send('window:move', dx, dy);
   },
 
-  /** 监听主进程事件 */
+  getNLSToken: (): Promise<{ appKey: string; url: string }> =>
+    new Promise((resolve) => {
+      const channel = 'nls-token-' + Date.now();
+      ipcRenderer.once(channel, (_event, result) => resolve(result));
+      ipcRenderer.send('nls:getToken', channel);
+    }),
+
+  sendMessage: (text: string, imageBase64?: string, audioBase64?: string): Promise<string> =>
+    new Promise((resolve) => {
+      const channel = 'ai-msg-' + Date.now();
+      ipcRenderer.once(channel, (_event, result) => resolve(result));
+      ipcRenderer.send('ai:sendMessage', channel, text, imageBase64, audioBase64);
+    }),
+
+  onStreamToken: (callback: (token: string) => void): void => {
+    ipcRenderer.on('ai:streamToken', (_event, token: string) => callback(token));
+  },
+
+  onStreamEnd: (callback: () => void): void => {
+    ipcRenderer.on('ai:streamEnd', () => callback());
+  },
+
+  onStreamError: (callback: (error: { code: string; message: string }) => void): void => {
+    ipcRenderer.on('ai:streamError', (_event, error) => callback(error));
+  },
+
+  getSettings: (): Promise<any> =>
+    new Promise((resolve) => {
+      const channel = 'settings-get-' + Date.now();
+      ipcRenderer.once(channel, (_event, result) => resolve(result));
+      ipcRenderer.send('settings:get', channel);
+    }),
+
+  saveSettings: (settings: any): Promise<any> =>
+    new Promise((resolve) => {
+      const channel = 'settings-save-' + Date.now();
+      ipcRenderer.once(channel, (_event, result) => resolve(result));
+      ipcRenderer.send('settings:save', channel, settings);
+    }),
+
   on: (channel: string, callback: (...args: unknown[]) => void): void => {
     const validChannels = ['cat:stateChange', 'cat:error'];
     if (validChannels.includes(channel)) {
@@ -53,13 +64,18 @@ const pixelcatAPI = {
     }
   },
 
-  /** 移除监听 */
   removeAllListeners: (channel: string): void => {
     ipcRenderer.removeAllListeners(channel);
   },
 };
 
-contextBridge.exposeInMainWorld('pixelcat', pixelcatAPI);
+// Test marker
+document.addEventListener('DOMContentLoaded', () => {
+  const marker = document.createElement('div');
+  marker.id = 'preload-marker';
+  marker.textContent = 'PRELOAD OK';
+  marker.style.cssText = 'position:absolute;top:0;left:0;color:#0f0;font-size:10px;z-index:999;';
+  document.body?.appendChild(marker);
+});
 
-// 类型声明（渲染进程用 JSDoc 引用）
-export type PixelCatAPI = typeof pixelcatAPI;
+contextBridge.exposeInMainWorld('pixelcat', pixelcatAPI);

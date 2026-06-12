@@ -88,12 +88,19 @@ window.addEventListener('error', (e) => {
       stateMachine.transition('thinking');
 
       // 调用 AI
-      await sendToAI(text, frame);
+      // 获取录音
+      const audioBase64 = await mediaCapture.stopListening();
+      // 抓帧
+      const frame = mediaCapture.captureFrame();
+      mediaCapture.stopCamera();
+
+      debugLog('Sending: text=' + text + ' audio=' + (audioBase64 ? Math.round(audioBase64.length/1024) + 'KB' : 'none'));
+      await sendToAI(text, frame, audioBase64);
     }
   });
 
   // ===== 发送到 AI（流式） =====
-  async function sendToAI(text, imageBase64) {
+  async function sendToAI(text, imageBase64, audioBase64) {
     if (!window.pixelcat) {
       stateMachine.transition('error', {
         message: '大脑还没启动喵...重启一下？'
@@ -148,7 +155,7 @@ window.addEventListener('error', (e) => {
 
     // 发送
     try {
-      const result = await window.pixelcat.sendMessage(text, imageBase64);
+      const result = await window.pixelcat.sendMessage(text, imageBase64, audioBase64);
       if (result && !speakingStarted) {
         // 非流式回退（某些 API 不支持流式）
         stateMachine.transition('speaking', { text: result });
@@ -262,6 +269,14 @@ window.addEventListener('error', (e) => {
   async function init() {
     debugLog('Init...');
     console.log('[PixelCat] Starting...');
+    debugLog('pixelcat exists: ' + !!window.pixelcat);
+
+    // 如果 pixelcat 还没就绪，等待
+    if (!window.pixelcat) {
+      debugLog('Waiting for preload...');
+      await new Promise(r => setTimeout(r, 1000));
+      debugLog('Retry: ' + !!window.pixelcat);
+    }
 
     // 预加载语音
     if (window.speechSynthesis) {
@@ -284,7 +299,7 @@ window.addEventListener('error', (e) => {
     }
 
     const ipcOk = await checkIPC();
-    debugLog('IPC: ' + ipcOk);
+    debugLog('IPC ping: ' + ipcOk);
     debugLog('STT available: ' + !!(window.SpeechRecognition || window.webkitSpeechRecognition));
     debugLog('Ready! Press SPACE to talk');
     console.log('[PixelCat] Ready');
