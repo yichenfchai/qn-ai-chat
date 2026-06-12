@@ -13,6 +13,14 @@ const pixelcatAPI = {
   ping: (): Promise<{ pong: boolean; ts: number }> =>
     ipcRenderer.invoke('ping'),
 
+  /** 设置读写 */
+  getSettings: (): Promise<any> => ipcRenderer.invoke('settings:get'),
+  saveSettings: (settings: any): Promise<boolean> => ipcRenderer.invoke('settings:save', settings),
+
+  /** NLS Token */
+  getNLSToken: (): Promise<{ appKey: string; url: string }> =>
+    ipcRenderer.invoke('nls:getToken'),
+
   /** AI 对话（流式）*/
   sendMessage: (text: string, imageBase64?: string): Promise<string> =>
     ipcRenderer.invoke('ai:sendMessage', text, imageBase64),

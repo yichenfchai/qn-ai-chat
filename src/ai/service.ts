@@ -55,9 +55,12 @@ export async function* sendVisionMessage(
   ctx: ConversationContext,
 ): AsyncGenerator<string> {
   const config = getConfig();
-  const baseURL = process.env.AI_BASE_URL || 'https://api.deepseek.com/v1';
-  const model = process.env.AI_MODEL || 'deepseek-v4-pro';
-  const apiKey = process.env.AI_API_KEY || config.DEEPSEEK_API_KEY;
+  // 优先使用 settings.json（用户右击设置面板保存的），其次 .env
+  const { getEffectiveSettings } = await import('../main/settings-store');
+  const eff = getEffectiveSettings();
+  const baseURL = eff.baseUrl || 'https://dashscope.aliyuncs.com/compatible-mode/v1';
+  const model = eff.model || 'qwen-vl-max';
+  const apiKey = eff.apiKey || process.env.AI_API_KEY || config.DEEPSEEK_API_KEY;
 
   // 构建消息
   const messages = buildContext(ctx);

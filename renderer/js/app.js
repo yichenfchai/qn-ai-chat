@@ -73,9 +73,9 @@ window.addEventListener('error', (e) => {
       // 获取转录文本
       let text = mediaCapture.transcript.trim();
       if (!text) {
-        // 没识别到文字
+        // STT 没识别到（可能被墙），提示文字输入
         stateMachine.transition('speaking', {
-          text: '喵？我没听清，再说一次吧~'
+          text: '喵？没听清...双击我打字吧~'
         });
         setTimeout(() => stateMachine.transition('idle'), 2500);
         return;
@@ -220,6 +220,43 @@ window.addEventListener('error', (e) => {
       return true;
     } catch { return false; }
   }
+
+  // ===== 双击文字输入（STT不可用时的兜底） =====
+  document.getElementById('pet').addEventListener('dblclick', async () => {
+    const textInputArea = document.getElementById('text-input-area');
+    const textInput = document.getElementById('text-input');
+    if (!textInputArea || !textInput) return;
+
+    textInputArea.style.display = 'block';
+    textInput.value = '';
+    textInput.focus();
+
+    // 打开摄像头抓帧
+    await mediaCapture.startCamera();
+
+    const handleSubmit = async () => {
+      const text = textInput.value.trim();
+      if (!text) return;
+      textInputArea.style.display = 'none';
+      textInput.removeEventListener('keydown', onKey);
+      resetIdleTimer();
+      stateMachine.transition('thinking');
+      const frame = mediaCapture.captureFrame();
+      mediaCapture.stopCamera();
+      sendToAI(text, frame);
+    };
+
+    const onKey = (e) => {
+      if (e.key === 'Enter') handleSubmit();
+      if (e.key === 'Escape') {
+        textInputArea.style.display = 'none';
+        textInput.removeEventListener('keydown', onKey);
+        mediaCapture.stopCamera();
+      }
+    };
+
+    textInput.addEventListener('keydown', onKey);
+  });
 
   // ===== 启动 =====
   async function init() {

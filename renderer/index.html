@@ -117,7 +117,7 @@
     <!-- 精灵图角色 -->
     <div id="pet">
       <img id="pet-img" src="sprites/cat.png" alt="pet">
-      <div id="hint">按住空格说话</div>
+      <div id="hint">空格说话 / 双击打字</div>
     </div>
 
     <!-- 状态指示器（右上角） -->
@@ -130,10 +130,78 @@
   <script src="js/state-machine.js"></script>
   <script src="js/sprite-animator.js"></script>
   <script src="js/media-capture.js"></script>
+  <script src="js/settings.js"></script>
   <script src="js/app.js"></script>
 
+    
+    <!-- 文字输入（双击猫弹出） -->
+    <div id="text-input-area" style="
+      position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+      display:none; z-index:200;
+    ">
+      <input id="text-input" type="text" placeholder="想说什么..."
+        style="padding:6px 10px; border-radius:12px; border:1px solid #ccc;
+               font-size:13px; width:180px; outline:none;
+               font-family:'Microsoft YaHei',sans-serif;"
+        autocomplete="off">
+    </div>
+    
+    <!-- 设置面板 -->
+    <div id="settings-panel">
+      <h3>设置</h3>
+      <label>AI API Key</label>
+      <input id="set-api-key" type="password" placeholder="输入你的 Qwen-VL API Key">
+      <label>AI 模型</label>
+      <input id="set-api-model" type="text" placeholder="qwen-vl-max">
+      <label>AI 地址</label>
+      <input id="set-api-url" type="text" placeholder="https://dashscope.aliyuncs.com/compatible-mode/v1">
+      <label>NLS AppKey（语音识别）</label>
+      <input id="set-nls-key" type="text" placeholder="阿里云NLS AppKey">
+      <br>
+      <button id="settings-save">保存</button>
+      <button id="settings-close">取消</button>
+      <div id="settings-status"></div>
+    </div>
+
+    <!-- 右键菜单 -->
+    <div id="context-menu" style="
+      position:absolute; z-index:400; display:none;
+      background:#333; border-radius:8px; padding:4px 0;
+      box-shadow:0 4px 12px rgba(0,0,0,0.5); min-width:100px;
+    ">
+      <div id="ctx-settings" style="
+        padding:8px 16px; cursor:pointer; font-size:12px;
+        color:#e0e0e0; font-family:'Microsoft YaHei',sans-serif;
+      ">设置</div>
+    </div>
     <!-- 调试面板（开发用） -->
-    <div id="debug-panel" style="
+    <div id="
+    /* 设置面板 */
+    #settings-panel {
+      position:absolute; top:0; left:0; right:0; bottom:0;
+      background:rgba(0,0,0,0.85); color:#e0e0e0;
+      z-index:300; display:none; 
+      padding:20px; font-family:'Microsoft YaHei',sans-serif;
+      font-size:12px; overflow-y:auto;
+    }
+    #settings-panel.show { display:block; }
+    #settings-panel h3 { font-size:14px; margin-bottom:12px; color:#fff; }
+    #settings-panel label { display:block; margin:8px 0 3px; color:#aaa; }
+    #settings-panel input {
+      width:100%; padding:6px 8px; border-radius:6px;
+      border:1px solid #555; background:#222; color:#fff;
+      font-size:12px; outline:none; font-family:monospace;
+    }
+    #settings-panel input:focus { border-color:#4fc3f7; }
+    #settings-panel button {
+      margin-top:12px; padding:6px 16px; border-radius:6px;
+      border:none; cursor:pointer; font-size:12px;
+    }
+    #settings-save { background:#4fc3f7; color:#000; margin-right:8px; }
+    #settings-close { background:#555; color:#fff; }
+    #settings-status { margin-top:8px; font-size:11px; color:#8f8; }
+    
+    #debug-panel" style="
       position:absolute; bottom:0; left:0; right:0;
       background:rgba(0,0,0,0.7); color:#0f0;
       font-size:10px; padding:4px 6px;
