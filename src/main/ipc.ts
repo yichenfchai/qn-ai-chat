@@ -1,27 +1,24 @@
 /**
- * IPC 处理器注册
- * 
- * 所有 Renderer → Main 的通信通过这里
- * 使用 ipcMain.handle 实现请求-响应模式
+ * IPC 处理器注册 — 使用 send/on 模式（Electron invoke bug workaround）
  */
 
 import { ipcMain, BrowserWindow } from 'electron';
-import { loadSettings, saveSettings } from './settings-store';
 import { createLogger } from './infra/logger';
+import { loadSettings, saveSettings } from './settings-store';
 
 const logger = createLogger('ipc');
 
 export interface IPCContext {
-  // 后续各模块会在这里添加自己的 handler
+  // 预留
 }
 
 /** 初始化所有 IPC 处理器 */
 export function registerIPCHandlers(ctx: IPCContext): void {
   logger.info('Registering IPC handlers');
 
-  // 健康检查
-  ipcMain.handle('ping', () => {
-    return { pong: true, ts: Date.now() };
+  // Ping
+  ipcMain.on('ping', (event, replyChannel: string) => {
+    event.reply(replyChannel, { pong: true, ts: Date.now() });
   });
 
   // 窗口拖拽
@@ -34,62 +31,64 @@ export function registerIPCHandlers(ctx: IPCContext): void {
   });
 
   // NLS Token
-  ipcMain.handle('nls:getToken', () => {
+  ipcMain.on('nls:getToken', (event, replyChannel: string) => {
     const { getEffectiveSettings } = require('./settings-store');
     const eff = getEffectiveSettings();
-    return {
+    event.reply(replyChannel, {
       appKey: eff.nlsAppKey || process.env.NLS_APP_KEY || '',
       url: 'wss://nls-gateway.cn-shanghai.aliyuncs.com/ws/v1',
-    };
+    });
   });
 
   // 设置读写
-  ipcMain.handle('settings:get', () => loadSettings());
-  ipcMain.handle('settings:save', (_event, settings: any) => {
-    saveSettings(settings);
-    return true;
+  ipcMain.on('settings:get', (event, replyChannel: string) => {
+    try {
+      event.reply(replyChannel, loadSettings());
+    } catch (e: any) {
+      logger.error('settings:get failed', { error: e.message });
+      event.reply(replyChannel, {});
+    }
   });
 
-  // AI 对话（流式）
-  ipcMain.handle('ai:sendMessage', async (event, text: string, imageBase64?: string) => {
+  ipcMain.on('settings:save', (event, replyChannel: string, settings: any) => {
+    console.log('=== settings:save CALLED ===');
+    try {
+      saveSettings(settings);
+      console.log('Settings saved');
+      event.reply(replyChannel, { ok: true });
+    } catch (e: any) {
+      console.log('Save error:', e.message);
+      event.reply(replyChannel, { ok: false, error: e.message });
+    }
+  });
+
+  // AI 对话（Qwen-Omni：音频+图片+文字）
+  ipcMain.on('ai:sendMessage', async (event, replyChannel: string, text: string, imageBase64?: string, audioBase64?: string) => {
     const win = BrowserWindow.fromWebContents(event.sender);
-    if (!win) return '';
+    if (!win) { event.reply(replyChannel, ''); return; }
 
     try {
-      // 动态导入 AI service（避免启动时加载）
-      const { sendVisionMessage } = await import('../ai/service');
+      const { sendOmniMessage } = await import('../ai/service');
       const { createContext } = await import('../ai/context');
-
-      const ctx = createContext(''); // TODO: 注入用户画像
+      const ctx = createContext('');
       let fullResponse = '';
 
-      for await (const token of sendVisionMessage(text, imageBase64 || undefined, ctx)) {
+      for await (const token of sendOmniMessage(text, audioBase64 || undefined, imageBase64 || undefined, ctx)) {
         fullResponse += token;
-        // 每个 token 推送给渲染进程
         win.webContents.send('ai:streamToken', token);
       }
 
       win.webContents.send('ai:streamEnd');
-      return fullResponse;
+      event.reply(replyChannel, fullResponse);
     } catch (err: any) {
-      logger.error('AI handler error', { message: err.message, code: err.code });
+      logger.error('AI error', { message: err.message, code: err.code });
       win.webContents.send('ai:streamError', {
         code: err.code || 'UNKNOWN',
         message: err.message || '未知错误',
       });
-      return '';
+      event.reply(replyChannel, '');
     }
   });
-
-  // TODO: AI 对话处理器（Day 1 下午）
-  // ipcMain.handle('ai:sendMessage', async (_, text: string, imageBase64?: string) => { ... });
-
-  // TODO: Agent 执行处理器（Day 2 上午）
-  // ipcMain.handle('agent:execute', async (_, tool: string, params: unknown) => { ... });
-
-  // TODO: 画像处理器（Day 2 上午）
-  // ipcMain.handle('profile:get', async () => { ... });
-  // ipcMain.handle('profile:update', async (_, updates: unknown) => { ... });
 
   logger.info('IPC handlers registered');
 }
