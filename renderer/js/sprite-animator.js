@@ -6,7 +6,8 @@
  */
 
 const SPRITES = {
-  idle: ['sprites/man1.png', 'sprites/man2.png', 'sprites/man3.png'],
+  idle:    ['sprites/man1.png', 'sprites/man2.png', 'sprites/man3.png'],
+  working: ['sprites/w1.png',   'sprites/w2.png',   'sprites/w3.png'],
 };
 
 // 暂不启用帧循环动画，保持站立姿态
@@ -16,6 +17,7 @@ const SPRITES = {
 /** 更新猫的表情状态（通过 CSS class 控制） */
 function updateCatExpression(expression) {
   const pet = document.getElementById('pet');
+  const img = document.getElementById('pet-img');
   if (!pet) return;
 
   // 移除所有状态类
@@ -32,6 +34,16 @@ function updateCatExpression(expression) {
 
   const cls = classMap[expression];
   if (cls) pet.classList.add(cls);
+
+  // 状态切换精灵图：thinking/speaking/executing → working(w1), 其余 → idle(man1)
+  if (img) {
+    const workingStates = ['thinking', 'speaking', 'executing'];
+    if (workingStates.includes(expression)) {
+      img.src = SPRITES.working[0];  // w1 站立
+    } else {
+      img.src = SPRITES.idle[0];     // man1 站立
+    }
+  }
 
   // 控制 Zzz
   showZZZ(expression === 'sleeping');
