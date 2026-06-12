@@ -11,3 +11,6 @@ release/
 Thumbs.db
 
 electron.log
+
+settings.json
+settings.json.tmp
