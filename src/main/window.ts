@@ -11,7 +11,7 @@ import { createLogger } from './infra/logger';
 
 const logger = createLogger('window');
 
-const WINDOW_WIDTH = 320;
+const WINDOW_WIDTH = 440;
 const WINDOW_HEIGHT = 420;
 
 let mainWindow: BrowserWindow | null = null;

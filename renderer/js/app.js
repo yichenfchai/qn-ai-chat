@@ -1,140 +1,120 @@
 /**
- * PixelCat — 渲染进程直接调用 AI API
+ * PixelCat — 入口，仅做 wiring
  */
-(function() {
-  'use strict';
-  let spacePressed = false;
-  let apiKey = '';
+(async function() {
+  // 1. 初始化 UI 组件
+  Bubble.init();
+  Settings.init();
+  Sprite.init();
+  Media.init();
 
-  // Get API key from settings on start
-  async function loadKey() {
-    if (window.pixelcat) {
-      try {
-        const settings = await window.pixelcat.getSettings();
-        apiKey = settings.apiKey || '';
-        console.log('API key loaded:', apiKey ? 'yes' : 'no');
-      } catch(e) { console.log('loadKey failed:', e); }
-    }
-  }
-
-  // Direct API call
-  async function callAI(text, imageBase64) {
-    if (!apiKey) return '请先在右键设置中填入 API Key';
-
-    const content = [];
-    if (imageBase64) content.push({ type: 'image_url', image_url: { url: imageBase64 } });
-    content.push({ type: 'text', text: text || '你好' });
-
+  // 2. 加载 API Key
+  if (window.pixelcat) {
     try {
-      const resp = await fetch('https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: 'qwen-vl-max', messages: [{ role: 'user', content }], max_tokens: 2048, stream: true }),
-        signal: AbortSignal.timeout(30000),
-      });
-
-      if (!resp.ok) {
-        const err = await resp.text().catch(()=>'');
-        return 'API错误(' + resp.status + '): ' + err.slice(0, 100);
-      }
-
-      const reader = resp.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '', full = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-        for (const line of lines) {
-          const t = line.trim();
-          if (!t.startsWith('data: ')) continue;
-          const d = t.slice(6);
-          if (d === '[DONE]') return full;
-          try {
-            const token = JSON.parse(d)?.choices?.[0]?.delta?.content;
-            if (token) {
-              full += token;
-              showSpeechBubble(full);
-            }
-          } catch {}
-        }
-      }
-      return full;
-    } catch(e) {
-      return '网络错误: ' + e.message;
-    }
+      const s = await window.pixelcat.getSettings();
+      if (s.apiKey) AI.setKey(s.apiKey);
+      console.log('[PixelCat] Key:', s.apiKey ? 'loaded' : 'not set');
+    } catch {}
   }
 
-  // === Space key ===
-  document.addEventListener('keydown', async (e) => {
+  // 3. 空格键：拍照 + 默认提问
+  let spacePressed = false;
+  document.addEventListener('keydown', async e => {
     if (e.code !== 'Space' || spacePressed || e.repeat) return;
     e.preventDefault();
     spacePressed = true;
-    resetIdleTimer();
-    const ok = await mediaCapture.startCamera();
-    if (!ok) { spacePressed = false; return; }
-    mediaCapture.startListening();
-    stateMachine.transition('listening');
+    State.go('listening');
+
+    const ok = await Media.start();
+    if (!ok) { spacePressed = false; State.go('error', { text: '摄像头权限被拒绝' }); return; }
+    await Media.startRecord();
   });
 
-  document.addEventListener('keyup', async (e) => {
+  document.addEventListener('keyup', async e => {
     if (e.code !== 'Space' || !spacePressed) return;
     e.preventDefault();
     spacePressed = false;
-    if (stateMachine.state !== 'listening') return;
-    stateMachine.transition('thinking');
-    mediaCapture.stopListening();
-    const frame = mediaCapture.captureFrame();
-    mediaCapture.stopCamera();
-    hideSpeechBubble();
-    const reply = await callAI('你好，看到什么了？', frame);
-    stateMachine.transition('speaking', { text: reply });
-    speakText(reply);
+    if (State.current !== 'listening') return;
+
+    const audio = await Media.stopRecord();
+    const frame = Media.captureFrame();
+    Media.stop();
+    Bubble.hide();
+
+    if (!AI.isReady()) {
+      State.go('error', { text: '请右键设置 API Key' });
+      return;
+    }
+
+    State.go('thinking');
+
+    try {
+      // Omni：音频 + 图片 + 文字一起发
+      const reply = await AI.chat({ text: '请根据画面和语音回复', image: frame, audio: audio || undefined });
+      State.go('speaking', { text: reply });
+      TTS.speak(reply)
+    } catch (e) {
+      State.go('error', { text: e.message });
+    }
   });
 
-  // === Double-click typing ===
+  // 4. 双击：文字输入
   document.getElementById('pet').addEventListener('dblclick', async () => {
     const area = document.getElementById('text-input-area');
     const input = document.getElementById('text-input');
-    if (!area || !input) return;
-    area.style.display = 'block'; input.value = ''; input.focus();
-    await mediaCapture.startCamera();
+    area.style.display = 'block';
+    input.value = '';
+    input.focus();
+
+    if (!AI.isReady()) {
+      State.go('error', { text: '请右键设置 API Key' });
+      area.style.display = 'none';
+      return;
+    }
+
+    const ok = await Media.start();
+    if (!ok) { area.style.display = 'none'; return; }
 
     const submit = async () => {
       const text = input.value.trim();
       if (!text) return;
       area.style.display = 'none';
       input.removeEventListener('keydown', onKey);
-      resetIdleTimer(); hideSpeechBubble();
-      stateMachine.transition('thinking');
-      const frame = mediaCapture.captureFrame();
-      mediaCapture.stopCamera();
-      const reply = await callAI(text, frame);
-      stateMachine.transition('speaking', { text: reply });
-      speakText(reply);
+      State.go('thinking');
+      Bubble.hide();
+
+      const frame = Media.captureFrame();
+      Media.stop();
+
+      try {
+        const reply = await AI.chat({ text, image: frame });
+        State.go('speaking', { text: reply });
+        TTS.speak(reply)
+      } catch (e) {
+        State.go('error', { text: e.message });
+      }
     };
-    const onKey = (e) => {
+
+    const onKey = e => {
       if (e.key === 'Enter') submit();
-      if (e.key === 'Escape') { area.style.display = 'none'; input.removeEventListener('keydown', onKey); mediaCapture.stopCamera(); }
+      if (e.key === 'Escape') { area.style.display = 'none'; input.removeEventListener('keydown', onKey); Media.stop(); }
     };
     input.addEventListener('keydown', onKey);
   });
 
-  function speakText(text) {
-    if (!window.speechSynthesis || !text) return;
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = 'zh-CN'; u.rate = 1.1; u.volume = 0.8;
-    window.speechSynthesis.speak(u);
-  }
-
+  // 5. 窗口失焦时清理
   window.addEventListener('blur', () => {
-    if (spacePressed) { spacePressed = false; mediaCapture.stopCamera(); }
+    if (spacePressed) { spacePressed = false; Media.stop(); }
   });
 
-  loadKey();
-  console.log('[PixelCat] Ready (direct API mode)');
+  // 6. 空闲 15 分钟 → 睡觉
+  let lastActive = Date.now();
+  document.addEventListener('click', () => { lastActive = Date.now(); if (State.current === 'sleeping') State.go('idle'); });
+  setInterval(() => {
+    if (Date.now() - lastActive > 15 * 60 * 1000 && State.current === 'idle') {
+      State.go('sleeping');
+    }
+  }, 30000);
+
+  console.log('[PixelCat] Ready');
 })();
