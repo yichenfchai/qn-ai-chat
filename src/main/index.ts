@@ -16,7 +16,7 @@ import * as path from 'path';
 // 必须在最前面加载 dotenv（Electron 主进程中 process.cwd() 是 app 目录）
 // 用绝对路径加载项目根目录的 .env
 try {
-  const dotenvPath = path.join(__dirname, '../../.env');
+  const dotenvPath = path.join(__dirname, '../../../.env');
   require('dotenv').config({ path: dotenvPath });
 } catch {
   // dotenv 是可选的，如果没安装就跳过（用系统环境变量）

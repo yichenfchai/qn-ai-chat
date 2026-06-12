@@ -12,119 +12,104 @@
                  connect-src 'self';">
   <title>PixelCat</title>
   <link rel="stylesheet" href="css/cat.css">
-  <link rel="stylesheet" href="css/animations.css">
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
+    * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body {
-      width: 100%;
-      height: 100%;
+      width: 100%; height: 100%;
       overflow: hidden;
       background: transparent;
       user-select: none;
       -webkit-app-region: no-drag;
     }
-
     #cat-container {
-      width: 100%;
-      height: 100%;
+      width: 100%; height: 100%;
       display: flex;
       align-items: center;
       justify-content: center;
       background: transparent;
       position: relative;
     }
-
-    /* 拖拽区域：猫的上半部分可以拖拽移动窗口 */
     #drag-handle {
       position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 150px;
+      top: 0; left: 0; right: 0;
+      height: 80px;
       -webkit-app-region: drag;
       cursor: grab;
       z-index: 10;
     }
+    #drag-handle:active { cursor: grabbing; }
 
-    #drag-handle:active {
-      cursor: grabbing;
+    /* 精灵图 */
+    #pet {
+      position: relative;
+      pointer-events: auto;
+      cursor: pointer;
+    }
+    #pet-img {
+      display: block;
+      width: 200px;
+      height: auto;
+      image-rendering: auto;
     }
 
-    /* 对话气泡 */
+    /* 气泡 */
     #speech-bubble {
       position: absolute;
       bottom: 20px;
       left: 50%;
       transform: translateX(-50%);
-      background: rgba(30, 30, 40, 0.92);
-      color: #e0e0e0;
+      background: rgba(255, 255, 255, 0.93);
+      color: #333;
       padding: 10px 16px;
       border-radius: 16px;
       font-size: 13px;
-      max-width: 280px;
-      min-width: 100px;
+      max-width: 260px;
+      min-width: 80px;
       text-align: center;
       opacity: 0;
       transition: opacity 0.3s ease;
       pointer-events: none;
       font-family: 'Microsoft YaHei', 'SimHei', sans-serif;
       line-height: 1.5;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
       z-index: 5;
     }
-
-    #speech-bubble.visible {
-      opacity: 1;
-    }
-
-    /* 气泡小三角 */
+    #speech-bubble.visible { opacity: 1; }
     #speech-bubble::after {
       content: '';
       position: absolute;
-      top: 100%;
-      left: 50%;
+      top: 100%; left: 50%;
       transform: translateX(-50%);
       border: 8px solid transparent;
-      border-top-color: rgba(30, 30, 40, 0.92);
+      border-top-color: rgba(255,255,255,0.93);
     }
 
-    /* 状态指示器 */
     #status-indicator {
       position: absolute;
-      top: 8px;
-      right: 8px;
-      width: 8px;
-      height: 8px;
+      top: 8px; right: 8px;
+      width: 8px; height: 8px;
       border-radius: 50%;
       background: #4caf50;
       opacity: 0.7;
       z-index: 10;
       transition: background 0.3s;
     }
-
     #status-indicator.listening { background: #ff5722; animation: pulse 0.8s infinite; }
     #status-indicator.thinking  { background: #ffc107; animation: pulse 0.5s infinite; }
     #status-indicator.speaking  { background: #2196f3; }
     #status-indicator.error     { background: #f44336; }
-
     @keyframes pulse {
-      0%, 100% { opacity: 0.4; }
-      50%      { opacity: 1;   }
+      0%,100% { opacity: 0.4; }
+      50%     { opacity: 1;   }
     }
 
-    /* 操作提示 */
     #hint {
       position: absolute;
       bottom: 0;
       left: 50%;
       transform: translateX(-50%);
       font-size: 10px;
-      color: rgba(255, 255, 255, 0.35);
+      color: rgba(255,255,255,0.35);
       pointer-events: none;
       font-family: 'Microsoft YaHei', sans-serif;
       letter-spacing: 0.5px;
@@ -133,24 +118,20 @@
 </head>
 <body>
   <div id="cat-container">
-    <!-- 拖拽把手 -->
     <div id="drag-handle" title="拖拽移动"></div>
-
-    <!-- 状态指示器 -->
     <div id="status-indicator"></div>
 
-    <!-- 像素猫渲染区 -->
-    <div id="cat"></div>
+    <!-- 精灵图角色 -->
+    <div id="pet">
+      <img id="pet-img" src="sprites/man1.png" alt="pet">
+    </div>
 
-    <!-- 对话气泡 -->
     <div id="speech-bubble"></div>
-
-    <!-- 操作提示 -->
     <div id="hint">按住空格说话</div>
   </div>
 
   <script src="js/state-machine.js"></script>
-  <script src="js/cat-renderer.js"></script>
+  <script src="js/sprite-animator.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
