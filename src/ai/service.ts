@@ -8,7 +8,7 @@
 import { getConfig } from '../main/infra/config';
 import { createLogger } from '../main/infra/logger';
 import { makeError } from '../main/infra/errors';
-import type { VisionMessage, ChatCompletionChunk, StreamCallback } from './types';
+import type { VisionMessage, ChatCompletionChunk, VisionContent } from './types';
 import { buildContext, type ConversationContext } from './context';
 
 const logger = createLogger('ai-service');
@@ -160,4 +160,3 @@ export async function* sendVisionMessage(
   }
 }
 
-import type { VisionContent } from './types';
