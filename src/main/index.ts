@@ -88,7 +88,7 @@ app.whenReady().then(() => {
   const win = createMainWindow();
 
   // 3. 注册 IPC
-  registerIPCHandlers({});
+  registerIPCHandlers();
 
   logger.info('PixelCat ready!');
 });
