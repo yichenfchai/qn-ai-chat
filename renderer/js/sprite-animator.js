@@ -1,7 +1,7 @@
 /**
  * 精灵动画控制器
  * 
- * 使用 man1/man2/man3 三帧循环
+ * 使用小猫精灵图 cat.png
  * 不同状态通过 pet div 的 CSS class 控制视觉效果
  */
 
@@ -9,7 +9,7 @@ const SPRITES = {
   idle: ['sprites/cat.png'],
 };
 
-// 帧循环已禁用 — 仅保持 w1 静态站立
+// 帧循环已禁用 — 仅保持 cat.png 静态站立
 
 /** 更新猫的表情状态（通过 CSS class 控制） */
 function updateCatExpression(expression) {
@@ -32,7 +32,7 @@ function updateCatExpression(expression) {
   const cls = classMap[expression];
   if (cls) pet.classList.add(cls);
 
-  // 统一使用 w1 精灵图（暂不切换）
+  // 统一使用 cat.png 精灵图
   if (img) img.src = SPRITES.idle[0];  // 统一使用 cat.png
 
   // 控制 Zzz
