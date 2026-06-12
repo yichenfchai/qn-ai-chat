@@ -6,6 +6,7 @@
  */
 
 import { ipcMain, BrowserWindow } from 'electron';
+import { loadSettings, saveSettings } from './settings-store';
 import { createLogger } from './infra/logger';
 
 const logger = createLogger('ipc');
@@ -30,6 +31,23 @@ export function registerIPCHandlers(ctx: IPCContext): void {
       const [x, y] = win.getPosition();
       win.setPosition(x + dx, y + dy);
     }
+  });
+
+  // NLS Token
+  ipcMain.handle('nls:getToken', () => {
+    const { getEffectiveSettings } = require('./settings-store');
+    const eff = getEffectiveSettings();
+    return {
+      appKey: eff.nlsAppKey || process.env.NLS_APP_KEY || '',
+      url: 'wss://nls-gateway.cn-shanghai.aliyuncs.com/ws/v1',
+    };
+  });
+
+  // 设置读写
+  ipcMain.handle('settings:get', () => loadSettings());
+  ipcMain.handle('settings:save', (_event, settings: any) => {
+    saveSettings(settings);
+    return true;
   });
 
   // AI 对话（流式）
