@@ -40,34 +40,6 @@ export function registerIPCHandlers() {
     });
   });
 
-  ipcMain.on('ai-chat', async (event, replyChannel: string, data: any) => {
-    const win = BrowserWindow.fromWebContents(event.sender);
-    if (!win) { event.reply(replyChannel, ''); return; }
-
-    const { text, imageBase64, audioBase64 } = data || {};
-
-    try {
-      const { sendVisionMessage } = await import('../ai/service');
-      const { createContext } = await import('../ai/context');
-      const ctx = createContext('');
-      let fullResponse = '';
-
-      for await (const token of sendVisionMessage(text || '', imageBase64, ctx)) {
-        fullResponse += token;
-        win.webContents.send('ai:streamToken', token);
-      }
-
-      win.webContents.send('ai:streamEnd');
-      event.reply(replyChannel, fullResponse);
-    } catch (err: any) {
-      logger.error('AI error', { message: err.message, code: err.code });
-      win.webContents.send('ai:streamError', {
-        code: err.code || 'UNKNOWN',
-        message: err.message || '未知错误',
-      });
-      event.reply(replyChannel, '');
-    }
-  });
-
+    // AI moved to renderer
   logger.info('IPC handlers registered');
 }
