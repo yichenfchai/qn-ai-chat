@@ -1,9 +1,3 @@
-/**
- * AI 服务 — Qwen-Omni 多模态调用
- * 支持音频+图片+文字一次性输入
- */
-
-import { getConfig } from '../main/infra/config';
 import { createLogger } from '../main/infra/logger';
 import { makeError } from '../main/infra/errors';
 import { getEffectiveSettings } from '../main/settings-store';
@@ -11,38 +5,30 @@ import { buildContext, type ConversationContext } from './context';
 
 const logger = createLogger('ai-service');
 
-export async function* sendOmniMessage(
+export async function* sendVisionMessage(
   text: string,
-  audioBase64: string | undefined,
   imageBase64: string | undefined,
   ctx: ConversationContext,
 ): AsyncGenerator<string> {
   const eff = getEffectiveSettings();
-  const apiKey = eff.apiKey || process.env.AI_API_KEY || getConfig().DEEPSEEK_API_KEY;
+  const apiKey = eff.apiKey || '';
+  const model = 'qwen-vl-max';
 
   const messages = buildContext(ctx);
 
-  // 构建多模态内容
-  const content: any[] = [{ text: text || '（用户没有说话，请根据画面回复）' }];
-
+  // Build user message with optional image
+  const content: any[] = [];
   if (imageBase64) {
-    content.push({ image: imageBase64 });
+    content.push({ type: 'image_url', image_url: { url: imageBase64 } });
   }
-  if (audioBase64) {
-    content.push({ audio: audioBase64 });
-  }
+  content.push({ type: 'text', text: text || '你好' });
 
-  const userMsg = { role: 'user', content };
-  const allMessages = [...messages, userMsg];
+  messages.push({ role: 'user', content });
 
-  logger.info('Omni request', {
-    hasImage: !!imageBase64,
-    hasAudio: !!audioBase64,
-    audioSize: audioBase64 ? Math.round(audioBase64.length / 1024) + 'KB' : 'N/A',
-  });
+  logger.info('AI request', { model, hasImage: !!imageBase64 });
 
   const resp = await fetch(
-    'https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation',
+    'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions',
     {
       method: 'POST',
       headers: {
@@ -50,9 +36,10 @@ export async function* sendOmniMessage(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'qwen-omni-turbo',
-        input: { messages: allMessages },
-        parameters: { max_tokens: 2048 },
+        model,
+        messages,
+        max_tokens: 2048,
+        stream: true,
       }),
       signal: AbortSignal.timeout(30000),
     },
@@ -60,17 +47,35 @@ export async function* sendOmniMessage(
 
   if (!resp.ok) {
     const errText = await resp.text().catch(() => '');
-    logger.error('Omni error', { status: resp.status, body: errText.slice(0, 200) });
+    logger.error('AI error', { status: resp.status, body: errText.slice(0, 200) });
     if (resp.status === 401) throw makeError('AI_INVALID_KEY');
+    if (resp.status === 429) throw makeError('AI_RATE_LIMIT');
     throw makeError('AI_MODEL_ERROR', { status: resp.status });
   }
 
-  const data = await resp.json();
-  const reply = data?.output?.choices?.[0]?.message?.content?.[0]?.text || '';
+  if (!resp.body) throw makeError('AI_EMPTY_RESP');
 
-  if (reply) {
-    yield reply;
-  } else {
-    throw makeError('AI_EMPTY_RESP');
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith('data: ')) continue;
+      const data = trimmed.slice(6);
+      if (data === '[DONE]') return;
+      try {
+        const chunk = JSON.parse(data);
+        const token = chunk?.choices?.[0]?.delta?.content;
+        if (token) yield token;
+      } catch {}
+    }
   }
 }

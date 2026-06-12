@@ -35,7 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
       try {
         const settings = await window.pixelcat.getSettings();
         document.getElementById('set-api-key').value = settings.apiKey || '';
-        document.getElementById('set-api-model').value = settings.model || 'qwen-vl-max';
+        document.getElementById('set-api-model').value = settings.model || 'qwen-omni-turbo';
         document.getElementById('set-api-url').value = settings.baseUrl || 'https://dashscope.aliyuncs.com/compatible-mode/v1';
         document.getElementById('set-nls-key').value = settings.nlsAppKey || '';
       } catch(e) {}
@@ -62,9 +62,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const settings = {
       apiKey: document.getElementById('set-api-key').value.trim(),
-      model: document.getElementById('set-api-model').value.trim(),
-      baseUrl: document.getElementById('set-api-url').value.trim(),
-      nlsAppKey: document.getElementById('set-nls-key').value.trim(),
     };
 
     try {
