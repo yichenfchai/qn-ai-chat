@@ -9,24 +9,9 @@ const SPRITES = {
   idle: ['sprites/man1.png', 'sprites/man2.png', 'sprites/man3.png'],
 };
 
-let currentFrame = 0;
-let frameCounter = 0;
-const FRAME_DELAY = 20; // 每 20 帧切换一次 (~330ms @ 60fps)
-
-/** 动画循环 */
-(function animLoop() {
-  frameCounter++;
-  if (frameCounter >= FRAME_DELAY) {
-    frameCounter = 0;
-    const sprites = SPRITES.idle;
-    currentFrame = (currentFrame + 1) % sprites.length;
-    const img = document.getElementById('pet-img');
-    if (img) {
-      img.src = sprites[currentFrame];
-    }
-  }
-  requestAnimationFrame(animLoop);
-})();
+// 暂不启用帧循环动画，保持站立姿态
+// const FRAME_DELAY = 20;
+// 三帧动画循环代码保留备用，需要时取消注释即可
 
 /** 更新猫的表情状态（通过 CSS class 控制） */
 function updateCatExpression(expression) {
