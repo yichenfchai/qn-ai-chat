@@ -13,6 +13,25 @@ const pixelcatAPI = {
   ping: (): Promise<{ pong: boolean; ts: number }> =>
     ipcRenderer.invoke('ping'),
 
+  /** AI 对话（流式）*/
+  sendMessage: (text: string, imageBase64?: string): Promise<string> =>
+    ipcRenderer.invoke('ai:sendMessage', text, imageBase64),
+
+  /** 监听流式 token */
+  onStreamToken: (callback: (token: string) => void): void => {
+    ipcRenderer.on('ai:streamToken', (_event, token: string) => callback(token));
+  },
+
+  /** 监听流结束 */
+  onStreamEnd: (callback: () => void): void => {
+    ipcRenderer.on('ai:streamEnd', () => callback());
+  },
+
+  /** 监听流错误 */
+  onStreamError: (callback: (error: { code: string; message: string }) => void): void => {
+    ipcRenderer.on('ai:streamError', (_event, error) => callback(error));
+  },
+
   /** 拖拽移动窗口 */
   moveWindow: (dx: number, dy: number): void => {
     ipcRenderer.send('window:move', dx, dy);
