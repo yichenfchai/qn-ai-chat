@@ -37,20 +37,6 @@ const pixelcatAPI = {
     ipcRenderer.send('window:move', dx, dy);
   },
 
-  // ===== AI 对话（Day 1 下午实现） =====
-  // sendMessage: (text: string, imageBase64?: string): Promise<AIResponse> =>
-  //   ipcRenderer.invoke('ai:sendMessage', text, imageBase64),
-
-  // ===== Agent 工具（Day 2 上午实现） =====
-  // execute: (tool: string, params: unknown): Promise<AgentResult> =>
-  //   ipcRenderer.invoke('agent:execute', tool, params),
-
-  // ===== 用户画像（Day 2 上午实现） =====
-  // getProfile: (): Promise<UserProfile> =>
-  //   ipcRenderer.invoke('profile:get'),
-  // updateProfile: (updates: Partial<UserProfile>): Promise<void> =>
-  //   ipcRenderer.invoke('profile:update', updates),
-
   /** 监听主进程事件 */
   on: (channel: string, callback: (...args: unknown[]) => void): void => {
     const validChannels = ['cat:stateChange', 'cat:error'];

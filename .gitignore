@@ -9,3 +9,5 @@ release/
 *.tsbuildinfo
 .DS_Store
 Thumbs.db
+
+electron.log

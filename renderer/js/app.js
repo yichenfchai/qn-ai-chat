@@ -110,16 +110,15 @@ window.addEventListener('error', (e) => {
 
     // 监听流式 token
     window.pixelcat.onStreamToken((token) => {
+      fullText += token;
       if (!speakingStarted) {
         stateMachine.transition('speaking', { text: token });
         speakingStarted = true;
-        // 开始 TTS（等凑够一句再读）
         startTTSIfReady();
       } else {
-        // 追加到气泡
-        fullText += token;
         showSpeechBubble(fullText);
       }
+      ttsBuffer += token;
     });
 
     // 监听流结束
@@ -210,14 +209,8 @@ window.addEventListener('error', (e) => {
     }
   });
 
-  // ===== 媒体流式追加到气泡 =====
-  // showSpeechBubble 只追加文字，不换动画
-  const origShowBubble = showSpeechBubble;
-  showSpeechBubble = function(text) {
-    origShowBubble(text);
-    // 追加到 TTS 缓冲
-    ttsBuffer += text;
-  };
+  // ===== 追加到 TTS 缓冲 =====
+  // 在 sendToAI 的 onStreamToken 回调里直接追加
 
   // ===== ICP 检查 =====
   async function checkIPC() {

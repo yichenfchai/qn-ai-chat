@@ -26,16 +26,19 @@
 
 ## 第三方依赖
 
-| 依赖 | 版本 | 用途 |
+| 依赖 | 版本 | 类型 |
 |------|------|------|
-| electron | ^28.0.0 | 桌面应用框架 |
-| electron-builder | ^24.0.0 | 打包为 exe |
-| typescript | ^5.3.0 | 主进程类型安全 |
-| vitest | ^1.0.0 | 单元测试 |
-| eslint | ^8.56.0 | 代码规范 |
-| dotenv | ^16.4.0 | .env 环境变量加载 |
+| dotenv | ^16.4.0 | runtime — .env 加载 |
+| electron | ^28.0.0 | dev — 桌面框架 |
+| electron-builder | ^24.0.0 | dev — 打包 |
+| typescript | ^5.3.0 | dev — 类型安全 |
+| vitest | ^1.0.0 | dev — 测试 |
+| eslint | ^8.56.0 | dev — 代码规范 |
+| @typescript-eslint/parser | ^6.19.0 | dev — TS lint |
+| @typescript-eslint/eslint-plugin | ^6.19.0 | dev — TS lint 规则 |
+| @types/node | ^20.11.0 | dev — Node 类型 |
 
-运行时依赖仅 1 个（dotenv），其余均为开发依赖。
+运行时依赖仅 1 个（dotenv）。
 
 ## 项目结构
 
