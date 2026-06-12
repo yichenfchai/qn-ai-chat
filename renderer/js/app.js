@@ -1,47 +1,56 @@
 /**
  * PixelCat 渲染进程入口
- * 
- * 完整流程：
- *   按住空格 → 开摄像头 + 开STT → 猫变倾听 → 
- *   松手 → 抓帧 + 取转录 → 猫变思考 → IPC发送 →
- *   接收流式token → 猫变说话 → 气泡逐字显示 + TTS朗读 →
- *   流结束 → 猫变空闲
  */
+
+// === 调试面板 ===
+let _debugPanel = null;
+function getDebugPanel() {
+  if (!_debugPanel) _debugPanel = document.getElementById('debug-panel');
+  return _debugPanel;
+}
+function debugLog(msg) {
+  console.log('[PixelCat]', msg);
+  const panel = getDebugPanel();
+  if (panel) {
+    const time = new Date().toLocaleTimeString();
+    panel.innerHTML += `<div>[${time}] ${msg}</div>`;
+    panel.scrollTop = panel.scrollHeight;
+  }
+}
+
+// 全局错误捕获
+window.addEventListener('error', (e) => {
+  debugLog('ERROR: ' + (e.error?.message || e.message));
+});
 
 (function () {
   'use strict';
 
+  debugLog('App starting...');
+
   let spacePressed = false;
-
-  // ===== 错误边界 =====
-  window.addEventListener('error', (event) => {
-    console.error('[PixelCat] Error:', event.error);
-    stateMachine?.transition('error', { message: '出了点问题...' });
-  });
-
-  window.addEventListener('unhandledrejection', (event) => {
-    console.error('[PixelCat] Rejection:', event.reason);
-    stateMachine?.transition('error', { message: '网络好像不太稳定喵...' });
-  });
 
   // ===== 空格键 =====
   document.addEventListener('keydown', async (event) => {
     if (event.code === 'Space' && !spacePressed && !event.repeat) {
       event.preventDefault();
       spacePressed = true;
+      debugLog('Space pressed');
       resetIdleTimer();
 
-      // 打开摄像头
+      debugLog('Starting camera...');
       const cameraOk = await mediaCapture.startCamera();
+      debugLog('Camera result: ' + cameraOk);
       if (!cameraOk) {
+        debugLog('Camera FAILED');
         spacePressed = false;
+        stateMachine.transition('error', { message: '摄像头启动失败' });
         return;
       }
 
-      // 开始语音识别
+      debugLog('Camera OK, starting mic...');
       mediaCapture.startListening();
       stateMachine.transition('listening');
-      console.log('[PixelCat] Listening...');
     }
   });
 
@@ -72,6 +81,7 @@
         return;
       }
 
+      debugLog('STT transcript: ' + text + (frame ? ' + image' : ''));
       console.log('[PixelCat] Sending:', text, frame ? `+ image(${Math.round(frame.length/1024)}KB)` : '');
 
       // 猫变思考
@@ -85,12 +95,15 @@
   // ===== 发送到 AI（流式） =====
   async function sendToAI(text, imageBase64) {
     if (!window.pixelcat) {
-      stateMachine.transition('speaking', {
-        text: '我的大脑还没启动喵...请稍等~'
+      stateMachine.transition('error', {
+        message: '大脑还没启动喵...重启一下？'
       });
-      setTimeout(() => stateMachine.transition('idle'), 2500);
+      setTimeout(() => stateMachine.transition('idle'), 3000);
       return;
     }
+
+    // TTS buffer
+    ttsBuffer = '';
 
     let fullText = '';
     let speakingStarted = false;
@@ -217,6 +230,7 @@
 
   // ===== 启动 =====
   async function init() {
+    debugLog('Init...');
     console.log('[PixelCat] Starting...');
 
     // 预加载语音
@@ -239,7 +253,10 @@
       console.warn('[PixelCat] SpeechRecognition not available — will use placeholder text');
     }
 
-    await checkIPC();
+    const ipcOk = await checkIPC();
+    debugLog('IPC: ' + ipcOk);
+    debugLog('STT available: ' + !!(window.SpeechRecognition || window.webkitSpeechRecognition));
+    debugLog('Ready! Press SPACE to talk');
     console.log('[PixelCat] Ready');
   }
 

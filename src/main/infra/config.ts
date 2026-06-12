@@ -30,6 +30,9 @@ const DEFAULTS: Record<string, string> = {
   TEMPERATURE: '0.7',
   AGENT_TIMEOUT_MS: '30000',
   LOG_LEVEL: 'info',
+  AI_BASE_URL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+  AI_MODEL: 'qwen-vl-max',
+  AI_API_KEY: '',
 };
 
 /** 检查并加载配置，失败则弹窗退出 */
