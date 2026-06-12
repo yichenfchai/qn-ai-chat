@@ -6,13 +6,10 @@
  */
 
 const SPRITES = {
-  idle:    ['sprites/man1.png', 'sprites/man2.png', 'sprites/man3.png'],
-  working: ['sprites/w1.png',   'sprites/w2.png',   'sprites/w3.png'],
+  idle: ['sprites/w1.png', 'sprites/w2.png', 'sprites/w3.png'],
 };
 
-// 暂不启用帧循环动画，保持站立姿态
-// const FRAME_DELAY = 20;
-// 三帧动画循环代码保留备用，需要时取消注释即可
+// 帧循环已禁用 — 仅保持 w1 静态站立
 
 /** 更新猫的表情状态（通过 CSS class 控制） */
 function updateCatExpression(expression) {
@@ -35,15 +32,8 @@ function updateCatExpression(expression) {
   const cls = classMap[expression];
   if (cls) pet.classList.add(cls);
 
-  // 状态切换精灵图：thinking/speaking/executing → working(w1), 其余 → idle(man1)
-  if (img) {
-    const workingStates = ['thinking', 'speaking', 'executing'];
-    if (workingStates.includes(expression)) {
-      img.src = SPRITES.working[0];  // w1 站立
-    } else {
-      img.src = SPRITES.idle[0];     // man1 站立
-    }
-  }
+  // 统一使用 w1 精灵图（暂不切换）
+  if (img) img.src = SPRITES.idle[0];
 
   // 控制 Zzz
   showZZZ(expression === 'sleeping');
@@ -88,22 +78,52 @@ function showZZZ(show) {
   }
 }
 
-/** 点击反馈 */
-function initClickHandler() {
+/** 拖拽 + 点击 */
+let dragInfo = null;
+
+function initDragAndClick() {
   const pet = document.getElementById('pet');
   if (!pet) return;
 
-  pet.addEventListener('click', (e) => {
-    if (e.target.closest('#drag-handle')) return;
-    pet.classList.add('clicked');
-    setTimeout(() => pet.classList.remove('clicked'), 300);
-    // 重置空闲计时器
-    if (typeof resetIdleTimer === 'function') resetIdleTimer();
+  pet.addEventListener('mousedown', (e) => {
+    dragInfo = {
+      screenX: e.screenX,
+      screenY: e.screenY,
+      moved: false,
+    };
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (!dragInfo) return;
+    const dx = e.screenX - dragInfo.screenX;
+    const dy = e.screenY - dragInfo.screenY;
+    if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
+      dragInfo.moved = true;
+      pet.classList.add('dragging');
+      // 通过 IPC 通知主进程移动窗口
+      if (window.pixelcat && window.pixelcat.moveWindow) {
+        window.pixelcat.moveWindow(dx, dy);
+      }
+      dragInfo.screenX = e.screenX;
+      dragInfo.screenY = e.screenY;
+    }
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (!dragInfo) return;
+    pet.classList.remove('dragging');
+    if (!dragInfo.moved) {
+      // 是点击，不是拖拽
+      pet.classList.add('clicked');
+      setTimeout(() => pet.classList.remove('clicked'), 300);
+      if (typeof resetIdleTimer === 'function') resetIdleTimer();
+    }
+    dragInfo = null;
   });
 }
 
 /** 初始化 */
 document.addEventListener('DOMContentLoaded', () => {
-  initClickHandler();
+  initDragAndClick();
   console.log('[PixelCat] Sprite animator ready');
 });
