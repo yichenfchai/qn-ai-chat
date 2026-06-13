@@ -1,120 +1,149 @@
 /**
- * PixelCat — 入口，仅做 wiring
+ * PixelCat — wiring 层
+ * 职责: 连接 Sprite 事件 → Media/API/TTS/Bubble
+ * 不包含业务逻辑
  */
 (async function() {
-  // 1. 初始化 UI 组件
   Bubble.init();
   Settings.init();
   Sprite.init();
   Media.init();
 
-  // 2. 加载 API Key
   if (window.pixelcat) {
     try {
       const s = await window.pixelcat.getSettings();
       if (s.apiKey) AI.setKey(s.apiKey);
-      console.log('[PixelCat] Key:', s.apiKey ? 'loaded' : 'not set');
     } catch {}
   }
 
-  // 3. 空格键：拍照 + 默认提问
-  let spacePressed = false;
-  document.addEventListener('keydown', async e => {
-    if (e.code !== 'Space' || spacePressed || e.repeat) return;
-    e.preventDefault();
-    spacePressed = true;
-    State.go('listening');
+  let _pending = false;
+  let _lockTimer = null;
 
+  function lock() {
+    _pending = true;
+    clearTimeout(_lockTimer);
+    _lockTimer = setTimeout(unlock, 15000);
+  }
+  function unlock() {
+    _pending = false;
+    clearTimeout(_lockTimer);
+    _lockTimer = null;
+  }
+
+  function tip(msg) { Bubble.show(msg); setTimeout(() => { if (!_pending) Bubble.hide(); }, 2000); }
+
+  async function interact({ text, audio, image }) {
+    Bubble.show('...');
+    const reply = await AI.chat({
+      text: text || '请根据画面和语音回复',
+      image,
+      audio: audio || undefined,
+      onToken: (token) => { Bubble.append(token); },
+    });
+    Bubble.show(reply);
+    TTS.speak(reply);
+
+    const tr = await Tool.execute(reply);
+    if (tr) {
+      if (tr.startsWith && tr.startsWith('data:')) {
+        Bubble.show('...');
+        const f2 = await AI.chat({ text: '分析这个截图', image: tr });
+        Bubble.show(f2);
+        TTS.speak(f2);
+      } else {
+        Bubble.show(tr);
+      }
+    }
+  }
+
+  // === Wiring: Sprite 事件 → 行为 ===
+
+  // 单击猫 → 唤醒摄像头
+  State.on('pet:wake', async () => {
+    if (_pending) return;
     const ok = await Media.start();
-    if (!ok) { spacePressed = false; State.go('error', { text: '摄像头权限被拒绝' }); return; }
-    await Media.startRecord();
+    if (ok !== true) tip('摄像头打开失败');
   });
 
-  document.addEventListener('keyup', async e => {
-    if (e.code !== 'Space' || !spacePressed) return;
-    e.preventDefault();
-    spacePressed = false;
-    if (State.current !== 'listening') return;
+  // 按住猫 → 开始录音
+  State.on('pet:record', () => {
+    if (_pending) { tip('请稍等...'); return; }
+    Media.startRecord();
+  });
 
-    const audio = await Media.stopRecord();
-    const frame = Media.captureFrame();
-    Media.stop();
-    Bubble.hide();
+  // 松开猫 → 发送语音
+  State.on('pet:send', async () => {
+    if (_pending) return;
+    if (!Media._recorder) return;
 
-    if (!AI.isReady()) {
-      State.go('error', { text: '请右键设置 API Key' });
-      return;
-    }
-
-    State.go('thinking');
-
+    lock();
     try {
-      // Omni：音频 + 图片 + 文字一起发
-      const reply = await AI.chat({ text: '请根据画面和语音回复', image: frame, audio: audio || undefined });
-      State.go('speaking', { text: reply });
-      TTS.speak(reply)
-    } catch (e) {
-      State.go('error', { text: e.message });
+      const audio = await Media.stopRecord();
+      const frame = Media.captureFrame();
+      if (!AI.isReady()) { tip('请右键设置 API Key'); return; }
+
+      document.getElementById('pet').classList.add('thinking');
+      await interact({ audio, image: frame });
+    } catch (err) {
+      tip(err.message || '出错了');
+    } finally {
+      document.getElementById('pet').classList.remove('thinking');
+      unlock();
     }
   });
 
-  // 4. 双击：文字输入
-  document.getElementById('pet').addEventListener('dblclick', async () => {
+  // 点别处 → 关摄像头
+  document.addEventListener('click', () => {
+    Media.shutdown();
+  });
+
+  // === 双击：文字输入 ===
+  document.getElementById('pet').addEventListener('dblclick', async e => {
+    e.stopPropagation();
+    if (_pending) { tip('请稍等...'); return; }
+
+    lock();
     const area = document.getElementById('text-input-area');
     const input = document.getElementById('text-input');
     area.style.display = 'block';
     input.value = '';
     input.focus();
 
-    if (!AI.isReady()) {
-      State.go('error', { text: '请右键设置 API Key' });
-      area.style.display = 'none';
-      return;
-    }
+    if (!AI.isReady()) { tip('请右键设置 API Key'); area.style.display = 'none'; unlock(); return; }
 
     const ok = await Media.start();
-    if (!ok) { area.style.display = 'none'; return; }
+    if (ok !== true) { area.style.display = 'none'; unlock(); return; }
 
+    let submitted = false;
     const submit = async () => {
+      if (submitted) return;
       const text = input.value.trim();
       if (!text) return;
+      submitted = true;
       area.style.display = 'none';
       input.removeEventListener('keydown', onKey);
-      State.go('thinking');
-      Bubble.hide();
-
-      const frame = Media.captureFrame();
-      Media.stop();
 
       try {
-        const reply = await AI.chat({ text, image: frame });
-        State.go('speaking', { text: reply });
-        TTS.speak(reply)
-      } catch (e) {
-        State.go('error', { text: e.message });
+        const frame = Media.captureFrame();
+        document.getElementById('pet').classList.add('thinking');
+        await interact({ text, image: frame });
+      } catch (err) {
+        tip(err.message || '出错了');
+      } finally {
+        document.getElementById('pet').classList.remove('thinking');
+        unlock();
       }
     };
 
     const onKey = e => {
       if (e.key === 'Enter') submit();
-      if (e.key === 'Escape') { area.style.display = 'none'; input.removeEventListener('keydown', onKey); Media.stop(); }
+      if (e.key === 'Escape') { area.style.display = 'none'; input.removeEventListener('keydown', onKey); unlock(); }
     };
     input.addEventListener('keydown', onKey);
   });
 
-  // 5. 窗口失焦时清理
-  window.addEventListener('blur', () => {
-    if (spacePressed) { spacePressed = false; Media.stop(); }
-  });
-
-  // 6. 空闲 15 分钟 → 睡觉
-  let lastActive = Date.now();
-  document.addEventListener('click', () => { lastActive = Date.now(); if (State.current === 'sleeping') State.go('idle'); });
-  setInterval(() => {
-    if (Date.now() - lastActive > 15 * 60 * 1000 && State.current === 'idle') {
-      State.go('sleeping');
-    }
-  }, 30000);
+  // === 失焦关摄像头 ===
+  window.addEventListener('blur', () => { Media.shutdown(); });
 
   console.log('[PixelCat] Ready');
 })();

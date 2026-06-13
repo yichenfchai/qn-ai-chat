@@ -3,6 +3,7 @@
  */
 import * as fs from 'fs';
 import * as path from 'path';
+import { app } from 'electron';
 import { createLogger } from './infra/logger';
 
 const logger = createLogger('settings');
@@ -14,7 +15,14 @@ export interface UserSettings {
   nlsAppKey: string;
 }
 
-const SETTINGS_PATH = path.join(process.cwd(), 'settings.json');
+// 开发阶段用项目根目录，打包后用 userData
+function getSettingsPath(): string {
+  if (app.isPackaged) {
+    return path.join(app.getPath('userData'), 'settings.json');
+  }
+  return path.join(process.cwd(), 'settings.json');
+}
+const SETTINGS_PATH = getSettingsPath();
 
 const DEFAULTS: UserSettings = {
   apiKey: '',

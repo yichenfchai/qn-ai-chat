@@ -1,50 +1,41 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
+// === window:move 节流 ===
+let _movePending = false;
+let _moveDx = 0;
+let _moveDy = 0;
+
 const pixelcatAPI = {
+  // invoke/handle 模式（自带 Promise + 错误传播）
   ping: (): Promise<{ pong: boolean; ts: number }> =>
-    new Promise((resolve) => {
-      const ch = 'ping-' + Date.now();
-      ipcRenderer.once(ch, (_e, r) => { console.log('>>> preload received reply:', JSON.stringify(r)?.slice(0, 80)); resolve(r); });
-      ipcRenderer.send('ping', ch);
-    }),
+    ipcRenderer.invoke('ping'),
 
   moveWindow: (dx: number, dy: number): void => {
-    ipcRenderer.send('window:move', dx, dy);
+    // 累加位移，一帧内只发一次 IPC
+    _moveDx += dx;
+    _moveDy += dy;
+    if (!_movePending) {
+      _movePending = true;
+      requestAnimationFrame(() => {
+        ipcRenderer.send('window:move', _moveDx, _moveDy);
+        _moveDx = 0;
+        _moveDy = 0;
+        _movePending = false;
+      });
+    }
   },
 
   getSettings: (): Promise<any> =>
-    new Promise((resolve) => {
-      const ch = 'sg-' + Date.now();
-      ipcRenderer.once(ch, (_e, r) => { console.log('>>> preload received reply:', JSON.stringify(r)?.slice(0, 80)); resolve(r); });
-      ipcRenderer.send('settings:get', ch);
-    }),
+    ipcRenderer.invoke('settings:get'),
 
   saveSettings: (settings: any): Promise<any> =>
-    new Promise((resolve) => {
-      const ch = 'ss-' + Date.now();
-      ipcRenderer.once(ch, (_e, r) => { console.log('>>> preload received reply:', JSON.stringify(r)?.slice(0, 80)); resolve(r); });
-      ipcRenderer.send('settings:save', ch, settings);
-    }),
+    ipcRenderer.invoke('settings:save', settings),
 
-  sendMessage: (text: string, imageBase64?: string): Promise<string> =>
-    new Promise((resolve) => {
-      const result = ipcRenderer.sendSync('ai-chat', { text, imageBase64 });
-      resolve(result || '');
-    }),
+  takeScreenshot: (): Promise<string> =>
+    ipcRenderer.invoke('tool:screenshot'),
 
-  onStreamToken: (cb: (token: string) => void): void => {
-    ipcRenderer.on('ai:streamToken', (_e, t) => cb(t));
-  },
-  onStreamEnd: (cb: () => void): void => {
-    ipcRenderer.on('ai:streamEnd', () => cb());
-  },
-  onStreamError: (cb: (err: any) => void): void => {
-    ipcRenderer.on('ai:streamError', (_e, err) => cb(err));
-  },
-
-  removeAllListeners: (ch: string): void => {
-    ipcRenderer.removeAllListeners(ch);
-  },
+  openApp: (name: string): Promise<string> =>
+    ipcRenderer.invoke('tool:openApp', name),
 };
 
 contextBridge.exposeInMainWorld('pixelcat', pixelcatAPI);

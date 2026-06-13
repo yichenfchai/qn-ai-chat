@@ -11,8 +11,8 @@ import { createLogger } from './infra/logger';
 
 const logger = createLogger('window');
 
-const WINDOW_WIDTH = 440;
-const WINDOW_HEIGHT = 420;
+const WINDOW_WIDTH = 410;
+const WINDOW_HEIGHT = 280;
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -53,10 +53,9 @@ export function createMainWindow(): BrowserWindow {
   });
 
   // 加载渲染器
-  mainWindow.webContents.openDevTools({ mode: 'detach' });
   mainWindow.loadFile(path.join(__dirname, '../../../renderer/index.html'));
 
-  // 开发时打开 DevTools — ENABLED
+  // 开发时打开 DevTools
   if (process.env.NODE_ENV === 'development') {
     mainWindow.webContents.openDevTools({ mode: 'detach' });
   }

@@ -53,5 +53,10 @@ const Settings = {
     document.getElementById('settings-close').addEventListener('click', () => {
       this._panel.style.display = 'none';
     });
+
+    // 退出应用
+    document.getElementById('ctx-menu-close').addEventListener('click', () => {
+      window.close();
+    });
   },
 };
