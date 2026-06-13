@@ -53,7 +53,7 @@ export function createMainWindow(): BrowserWindow {
   });
 
   // 加载渲染器
-  mainWindow.loadFile(path.join(__dirname, '../../renderer/index.html'));
+  mainWindow.loadFile(path.join(__dirname, '../../../renderer/index.html'));
 
   // 开发时打开 DevTools
   if (process.env.NODE_ENV === 'development') {

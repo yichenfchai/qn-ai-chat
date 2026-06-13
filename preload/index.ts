@@ -13,6 +13,11 @@ const pixelcatAPI = {
   ping: (): Promise<{ pong: boolean; ts: number }> =>
     ipcRenderer.invoke('ping'),
 
+  /** 拖拽移动窗口 */
+  moveWindow: (dx: number, dy: number): void => {
+    ipcRenderer.send('window:move', dx, dy);
+  },
+
   // ===== AI 对话（Day 1 下午实现） =====
   // sendMessage: (text: string, imageBase64?: string): Promise<AIResponse> =>
   //   ipcRenderer.invoke('ai:sendMessage', text, imageBase64),
