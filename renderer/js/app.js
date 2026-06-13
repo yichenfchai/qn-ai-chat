@@ -34,6 +34,15 @@
 
   async function interact({ text, audio, image }) {
     Bubble.show('...');
+
+    // WeatherAgent 预处理：检测天气/日期查询 → 注入数据
+    if (text && typeof WeatherAgent !== 'undefined') {
+      try {
+        const augmented = await WeatherAgent.augment(text);
+        if (augmented) text = augmented;
+      } catch (e) { /* 静默降级 */ }
+    }
+
     const reply = await AI.chat({
       text: text || '请根据画面和语音回复',
       image,
