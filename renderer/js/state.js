@@ -1,13 +1,10 @@
 /**
- * 状态机 — 事件驱动，不依赖任何模块
- * 
- * 使用：state.on('change', (newState, oldState) => { ... })
+ * 极简事件总线 — 供 UI 组件订阅
+ * 不再管理交互状态（交互由 app.js 的 _pending 处理）
  */
 const State = {
-  _current: 'idle',
   _listeners: {},
 
-  /** 监听事件 */
   on(event, fn) {
     if (!this._listeners[event]) this._listeners[event] = [];
     this._listeners[event].push(fn);
@@ -16,19 +13,9 @@ const State = {
     };
   },
 
-  /** 触发事件 */
-  _emit(event, data) {
-    (this._listeners[event] || []).forEach(fn => fn(data, this._current));
-  },
-
-  /** 获取当前状态 */
-  get current() { return this._current; },
-
-  /** 切换状态 */
-  go(newState, data) {
-    const old = this._current;
-    if (old === newState) return;
-    this._current = newState;
-    this._emit('change', { from: old, to: newState, data });
+  emit(event, data) {
+    (this._listeners[event] || []).forEach(fn => {
+      try { fn(data); } catch(e) { console.error('State listener error:', e); }
+    });
   },
 };

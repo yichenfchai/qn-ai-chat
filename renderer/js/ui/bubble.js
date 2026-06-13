@@ -11,7 +11,7 @@ const Bubble = {
     State.on('change', ({ to, data }) => {
       if (to === 'speaking' && data?.text) this.show(data.text);
       else if (to === 'thinking') this.show('...');
-      else if (to === 'idle') this.hide();
+      // idle 不隐藏气泡 — 由下次交互的 Bubble.hide() 清理
     });
   },
 
