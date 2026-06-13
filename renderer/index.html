@@ -4,138 +4,139 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy" 
-        content="default-src 'self'; 
-                 style-src 'self' 'unsafe-inline'; 
-                 script-src 'self';
-                 media-src 'self' blob:;
-                 img-src 'self' data: blob:;
-                 connect-src 'self';">
+        content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self';
+                 media-src 'self' blob:; img-src 'self' data: blob:; connect-src 'self' https://dashscope.aliyuncs.com https://*.aliyuncs.com;">
   <title>PixelCat</title>
   <link rel="stylesheet" href="css/cat.css">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body {
       width: 100%; height: 100%;
-      overflow: hidden;
-      background: transparent;
-      user-select: none;
-      -webkit-app-region: no-drag;
+      overflow: hidden; background: transparent;
+      user-select: none; -webkit-app-region: no-drag;
     }
     #cat-container {
       width: 100%; height: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: transparent;
-      position: relative;
+      display: flex; align-items: center; justify-content: center;
+      background: transparent; position: relative;
     }
     #drag-handle {
-      position: absolute;
-      top: 0; left: 0; right: 0;
-      height: 80px;
-      -webkit-app-region: drag;
-      cursor: grab;
-      z-index: 10;
+      position: absolute; top: 0; left: 0; right: 0; height: 80px;
+      -webkit-app-region: drag; cursor: grab; z-index: 10;
     }
     #drag-handle:active { cursor: grabbing; }
-
-    /* 精灵图 */
-    #pet {
-      position: relative;
-      pointer-events: auto;
-      cursor: grab;
-    }
-    #pet.dragging {
-      cursor: grabbing;
-    }
-    #pet-img {
-      display: block;
-      width: 100px;
-      height: auto;
-      image-rendering: auto;
-    }
-
-    /* 气泡 */
+    #pet { position: relative; pointer-events: auto; cursor: pointer; }
+    #pet-img { display: block; width: 100px; height: auto; }
     #speech-bubble {
-      position: absolute;
-      bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(255, 255, 255, 0.93);
-      color: #333;
-      padding: 10px 16px;
-      border-radius: 16px;
-      font-size: 13px;
-      max-width: 260px;
-      min-width: 80px;
-      text-align: center;
-      opacity: 0;
-      transition: opacity 0.3s ease;
-      pointer-events: none;
-      font-family: 'Microsoft YaHei', 'SimHei', sans-serif;
-      line-height: 1.5;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-      z-index: 5;
+      position: absolute; top: 0; left: 110%;
+      background: rgba(255,255,255,0.93); color: #333;
+      padding: 10px 14px; border-radius: 14px; font-size: 13px;
+      max-width: 300px; min-width: 100px; text-align: left;
+      opacity: 0; transition: opacity 0.3s ease; pointer-events: none;
+      font-family: 'Microsoft YaHei', sans-serif; line-height: 1.5;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.12); z-index: 5;
     }
     #speech-bubble.visible { opacity: 1; }
-    #speech-bubble::after {
-      content: '';
-      position: absolute;
-      top: 100%; left: 50%;
-      transform: translateX(-50%);
-      border: 8px solid transparent;
-      border-top-color: rgba(255,255,255,0.93);
-    }
-
     #status-indicator {
-      position: absolute;
-      top: -4px; right: -4px;
-      width: 6px; height: 6px;
-      border-radius: 50%;
-      background: #4caf50;
-      opacity: 0.5;
-      z-index: 10;
-      transition: background 0.3s;
+      position: absolute; top: 8px; right: 8px;
+      width: 6px; height: 6px; border-radius: 50%;
+      background: #4caf50; opacity: 0.5; z-index: 10;
     }
-    #status-indicator.listening { background: #ff5722; animation: pulse 0.8s infinite; }
-    #status-indicator.thinking  { background: #ffc107; animation: pulse 0.5s infinite; }
-    #status-indicator.speaking  { background: #2196f3; }
-    #status-indicator.error     { background: #f44336; }
-    @keyframes pulse {
-      0%,100% { opacity: 0.4; }
-      50%     { opacity: 1;   }
+    #hint {
+      position: absolute; bottom: -18px; left: 50%;
+      transform: translateX(-50%); font-size: 10px;
+      color: rgba(255,255,255,0.25); pointer-events: none; white-space: nowrap;
+      font-family: 'Microsoft YaHei', sans-serif;
+    }
+    /* 设置面板 */
+    #settings-panel {
+      position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.88); color: #e0e0e0;
+      z-index: 300; display: none; padding: 20px;
+      font-family: 'Microsoft YaHei', sans-serif; font-size: 12px; overflow-y: auto;
+    }
+    #settings-panel h3 { font-size: 14px; margin-bottom: 12px; color: #fff; }
+    #settings-panel label { display: block; margin: 8px 0 3px; color: #aaa; }
+    #settings-panel input {
+      width: 100%; padding: 6px 8px; border-radius: 6px;
+      border: 1px solid #555; background: #222; color: #fff;
+      font-size: 12px; outline: none; font-family: monospace;
+    }
+    #settings-panel input:focus { border-color: #4fc3f7; }
+    #settings-panel button { margin-top: 12px; padding: 6px 16px; border-radius: 6px; border: none; cursor: pointer; font-size: 12px; }
+    #settings-save { background: #4fc3f7; color: #000; margin-right: 8px; }
+    #settings-close { background: #555; color: #fff; }
+    #settings-status { margin-top: 8px; font-size: 11px; color: #8f8; }
+    /* 右键菜单 */
+    #ctx-menu {
+      position: absolute; z-index: 400; display: none;
+      background: #333; border-radius: 8px; padding: 4px 0;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5); min-width: 100px;
+    }
+    #ctx-menu-item {
+      padding: 8px 16px; cursor: pointer; font-size: 12px;
+      color: #e0e0e0; font-family: 'Microsoft YaHei', sans-serif;
+    }
+    #ctx-menu-item:hover { background: #444; }
+    /* 文字输入 */
+    #text-input-area {
+      position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+      margin-top: 8px;
+      display: none; z-index: 200;
+    }
+    #text-input {
+      padding: 8px 12px; border-radius: 12px; border: 2px solid #4fc3f7;
+      background: rgba(0,0,0,0.8); color: #fff;
+      font-size: 13px; width: 180px; outline: none;
+      font-family: 'Microsoft YaHei', sans-serif;
     }
 
-    #hint {
-      position: absolute;
-      bottom: -18px;
-      left: 50%;
-      transform: translateX(-50%);
-      font-size: 10px;
-      color: rgba(255,255,255,0.25);
-      pointer-events: none;
-      font-family: 'Microsoft YaHei', sans-serif;
-      white-space: nowrap;
-    }
   </style>
 </head>
 <body>
   <div id="cat-container">
     <div id="drag-handle" title="拖拽移动"></div>
-    <div id="status-indicator"></div>
 
-    <!-- 精灵图角色 -->
     <div id="pet">
-      <div id="status-indicator"></div>
+      <div id="speech-bubble"></div>
       <img id="pet-img" src="sprites/cat.png" alt="pet">
-      <div id="hint">按住空格说话</div>
+      <div id="hint">空格说话 / 双击打字</div>
+      <div id="text-input-area">
+        <input id="text-input" type="text" placeholder="想说什么..." autocomplete="off">
+      </div>
     </div>
 
+    <div id="status-indicator"></div>
     <div id="speech-bubble"></div>
+
+    <div id="settings-panel">
+      <h3>设置</h3>
+      <label>API Key</label>
+      <input id="set-api-key" type="password" placeholder="输入百炼 API Key">
+      <br>
+      <button id="settings-save">保存</button>
+      <button id="settings-close">取消</button>
+      <div id="settings-status"></div>
+    </div>
+
+    <div id="ctx-menu">
+      <div id="ctx-menu-item">设置</div>
+    </div>
+
+    <div id="text-input-area">
+      <input id="text-input" type="text" placeholder="想说什么..." autocomplete="off">
+    </div>
+
+
   </div>
 
-  <script src="js/state-machine.js"></script>
-  <script src="js/sprite-animator.js"></script>
+  <script src="js/state.js"></script>
+  <script src="js/core/api.js"></script>
+  <script src="js/core/media.js"></script>
+  <script src="js/core/tts.js"></script>
+  <script src="js/ui/bubble.js"></script>
+  <script src="js/ui/settings.js"></script>
+  <script src="js/ui/sprite.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

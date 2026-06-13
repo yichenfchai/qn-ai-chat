@@ -67,6 +67,15 @@ app.on('second-instance', () => {
 
 // 应用就绪
 app.whenReady().then(() => {
+  // 0. 授予摄像头/麦克风权限（Electron 需要显式处理）
+  const { session } = require('electron');
+  session.defaultSession.setPermissionRequestHandler(
+    (_webContents: any, permission: string, callback: Function) => {
+      const allowed = ['media', 'mediaKeySystem', 'camera', 'microphone'];
+      callback(allowed.includes(permission));
+    }
+  );
+
   // 1. 校验配置
   const config = validateConfig();
   if (!config) {
@@ -79,7 +88,7 @@ app.whenReady().then(() => {
   const win = createMainWindow();
 
   // 3. 注册 IPC
-  registerIPCHandlers({});
+  registerIPCHandlers();
 
   logger.info('PixelCat ready!');
 });

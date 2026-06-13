@@ -1,88 +1,120 @@
 /**
- * PixelCat 渲染进程入口
+ * PixelCat — 入口，仅做 wiring
  */
+(async function() {
+  // 1. 初始化 UI 组件
+  Bubble.init();
+  Settings.init();
+  Sprite.init();
+  Media.init();
 
-(function () {
-  'use strict';
-
-  // 错误边界
-  window.addEventListener('error', (event) => {
-    console.error('[PixelCat] Error:', event.error);
-    if (stateMachine) {
-      stateMachine.transition('error', {
-        message: '出了点问题...',
-        detail: event.error ? event.error.message : String(event),
-      });
-    }
-  });
-
-  window.addEventListener('unhandledrejection', (event) => {
-    console.error('[PixelCat] Rejection:', event.reason);
-    if (stateMachine) {
-      stateMachine.transition('error', { message: '网络好像不太稳定喵...' });
-    }
-  });
-
-  // IPC 检查
-  async function checkIPC() {
-    if (!window.pixelcat) return false;
+  // 2. 加载 API Key
+  if (window.pixelcat) {
     try {
-      await window.pixelcat.ping();
-      return true;
-    } catch { return false; }
+      const s = await window.pixelcat.getSettings();
+      if (s.apiKey) AI.setKey(s.apiKey);
+      console.log('[PixelCat] Key:', s.apiKey ? 'loaded' : 'not set');
+    } catch {}
   }
 
-  // 空格键：按住说话
+  // 3. 空格键：拍照 + 默认提问
   let spacePressed = false;
+  document.addEventListener('keydown', async e => {
+    if (e.code !== 'Space' || spacePressed || e.repeat) return;
+    e.preventDefault();
+    spacePressed = true;
+    State.go('listening');
 
-  document.addEventListener('keydown', (event) => {
-    if (event.code === 'Space' && !spacePressed && !event.repeat) {
-      event.preventDefault();
-      spacePressed = true;
-      resetIdleTimer();
-      stateMachine.transition('listening');
-      console.log('[PixelCat] Space pressed - listening');
+    const ok = await Media.start();
+    if (!ok) { spacePressed = false; State.go('error', { text: '摄像头权限被拒绝' }); return; }
+    await Media.startRecord();
+  });
+
+  document.addEventListener('keyup', async e => {
+    if (e.code !== 'Space' || !spacePressed) return;
+    e.preventDefault();
+    spacePressed = false;
+    if (State.current !== 'listening') return;
+
+    const audio = await Media.stopRecord();
+    const frame = Media.captureFrame();
+    Media.stop();
+    Bubble.hide();
+
+    if (!AI.isReady()) {
+      State.go('error', { text: '请右键设置 API Key' });
+      return;
+    }
+
+    State.go('thinking');
+
+    try {
+      // Omni：音频 + 图片 + 文字一起发
+      const reply = await AI.chat({ text: '请根据画面和语音回复', image: frame, audio: audio || undefined });
+      State.go('speaking', { text: reply });
+      TTS.speak(reply)
+    } catch (e) {
+      State.go('error', { text: e.message });
     }
   });
 
-  document.addEventListener('keyup', (event) => {
-    if (event.code === 'Space' && spacePressed) {
-      event.preventDefault();
-      spacePressed = false;
-      if (stateMachine.state === 'listening') {
-        stateMachine.transition('thinking');
-        console.log('[PixelCat] Space released - thinking');
+  // 4. 双击：文字输入
+  document.getElementById('pet').addEventListener('dblclick', async () => {
+    const area = document.getElementById('text-input-area');
+    const input = document.getElementById('text-input');
+    area.style.display = 'block';
+    input.value = '';
+    input.focus();
 
-        // TODO: Day1下午 - 实际发送给AI
-        setTimeout(() => {
-          stateMachine.transition('speaking', {
-            text: '喵~ 我听到你说话了！但AI还没接上，这是占位回复。'
-          });
-          setTimeout(() => {
-            stateMachine.transition('idle');
-          }, 3000);
-        }, 1500);
+    if (!AI.isReady()) {
+      State.go('error', { text: '请右键设置 API Key' });
+      area.style.display = 'none';
+      return;
+    }
+
+    const ok = await Media.start();
+    if (!ok) { area.style.display = 'none'; return; }
+
+    const submit = async () => {
+      const text = input.value.trim();
+      if (!text) return;
+      area.style.display = 'none';
+      input.removeEventListener('keydown', onKey);
+      State.go('thinking');
+      Bubble.hide();
+
+      const frame = Media.captureFrame();
+      Media.stop();
+
+      try {
+        const reply = await AI.chat({ text, image: frame });
+        State.go('speaking', { text: reply });
+        TTS.speak(reply)
+      } catch (e) {
+        State.go('error', { text: e.message });
       }
-    }
+    };
+
+    const onKey = e => {
+      if (e.key === 'Enter') submit();
+      if (e.key === 'Escape') { area.style.display = 'none'; input.removeEventListener('keydown', onKey); Media.stop(); }
+    };
+    input.addEventListener('keydown', onKey);
   });
 
+  // 5. 窗口失焦时清理
   window.addEventListener('blur', () => {
-    if (spacePressed) {
-      spacePressed = false;
-      if (stateMachine.state === 'listening') {
-        stateMachine.transition('idle');
-      }
-    }
+    if (spacePressed) { spacePressed = false; Media.stop(); }
   });
 
-  // 启动
-  async function init() {
-    console.log('[PixelCat] Starting...', {
-      electron: !!window.pixelcat,
-    });
-    await checkIPC();
-    console.log('[PixelCat] Ready');
-  }
+  // 6. 空闲 15 分钟 → 睡觉
+  let lastActive = Date.now();
+  document.addEventListener('click', () => { lastActive = Date.now(); if (State.current === 'sleeping') State.go('idle'); });
+  setInterval(() => {
+    if (Date.now() - lastActive > 15 * 60 * 1000 && State.current === 'idle') {
+      State.go('sleeping');
+    }
+  }, 30000);
 
-  init();
+  console.log('[PixelCat] Ready');
 })();

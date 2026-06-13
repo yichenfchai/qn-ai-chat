@@ -22,6 +22,8 @@ export interface AppConfig {
 }
 
 const REQUIRED_KEYS = ['DEEPSEEK_API_KEY'] as const;
+// 如果提供了 AI_API_KEY，DEEPSEEK_API_KEY 不强制
+const AI_KEYS = ['AI_API_KEY'] as const;
 
 const DEFAULTS: Record<string, string> = {
   DEEPSEEK_BASE_URL: 'https://api.deepseek.com/v1',
@@ -30,13 +32,19 @@ const DEFAULTS: Record<string, string> = {
   TEMPERATURE: '0.7',
   AGENT_TIMEOUT_MS: '30000',
   LOG_LEVEL: 'info',
+  AI_BASE_URL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+  AI_MODEL: 'qwen-vl-max',
+  AI_API_KEY: '',
 };
 
 /** 检查并加载配置，失败则弹窗退出 */
 export function validateConfig(): AppConfig | null {
   // 检查必需项
   const missing: string[] = [];
-  for (const key of REQUIRED_KEYS) {
+  // 如果 AI_API_KEY 已配置，DEEPSEEK_API_KEY 不强制
+  const hasAIKey = process.env.AI_API_KEY && process.env.AI_API_KEY.length > 3;
+  const required = hasAIKey ? [] : [...REQUIRED_KEYS];
+  for (const key of required) {
     if (!process.env[key]) {
       missing.push(key);
     }

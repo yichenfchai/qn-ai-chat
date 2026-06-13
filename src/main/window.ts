@@ -11,7 +11,7 @@ import { createLogger } from './infra/logger';
 
 const logger = createLogger('window');
 
-const WINDOW_WIDTH = 320;
+const WINDOW_WIDTH = 440;
 const WINDOW_HEIGHT = 420;
 
 let mainWindow: BrowserWindow | null = null;
@@ -47,15 +47,16 @@ export function createMainWindow(): BrowserWindow {
     webPreferences: {
       contextIsolation: true,     // ⚠️ 渲染器隔离
       nodeIntegration: false,    // ⚠️ 禁止渲染器使用 Node
-      sandbox: true,             // ⚠️ 沙箱模式
+      sandbox: false,  // disabled for IPC debug             // ⚠️ 沙箱模式
       preload: path.join(__dirname, '../../preload/index.js'),
     },
   });
 
   // 加载渲染器
+  mainWindow.webContents.openDevTools({ mode: 'detach' });
   mainWindow.loadFile(path.join(__dirname, '../../../renderer/index.html'));
 
-  // 开发时打开 DevTools
+  // 开发时打开 DevTools — ENABLED
   if (process.env.NODE_ENV === 'development') {
     mainWindow.webContents.openDevTools({ mode: 'detach' });
   }

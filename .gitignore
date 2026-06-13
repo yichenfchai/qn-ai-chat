@@ -9,3 +9,8 @@ release/
 *.tsbuildinfo
 .DS_Store
 Thumbs.db
+
+electron.log
+
+settings.json
+settings.json.tmp

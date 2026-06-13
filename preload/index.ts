@@ -1,52 +1,50 @@
-/**
- * Preload 脚本 — contextBridge 安全桥接
- * 
- * ⚠️ 这是 Main ↔ Renderer 的唯一通信通道
- * 只暴露白名单 API，Renderer 无法直接访问 Node.js
- */
-
 import { contextBridge, ipcRenderer } from 'electron';
 
-/** 暴露给渲染进程的 API */
 const pixelcatAPI = {
-  /** 健康检查 */
   ping: (): Promise<{ pong: boolean; ts: number }> =>
-    ipcRenderer.invoke('ping'),
+    new Promise((resolve) => {
+      const ch = 'ping-' + Date.now();
+      ipcRenderer.once(ch, (_e, r) => { console.log('>>> preload received reply:', JSON.stringify(r)?.slice(0, 80)); resolve(r); });
+      ipcRenderer.send('ping', ch);
+    }),
 
-  /** 拖拽移动窗口 */
   moveWindow: (dx: number, dy: number): void => {
     ipcRenderer.send('window:move', dx, dy);
   },
 
-  // ===== AI 对话（Day 1 下午实现） =====
-  // sendMessage: (text: string, imageBase64?: string): Promise<AIResponse> =>
-  //   ipcRenderer.invoke('ai:sendMessage', text, imageBase64),
+  getSettings: (): Promise<any> =>
+    new Promise((resolve) => {
+      const ch = 'sg-' + Date.now();
+      ipcRenderer.once(ch, (_e, r) => { console.log('>>> preload received reply:', JSON.stringify(r)?.slice(0, 80)); resolve(r); });
+      ipcRenderer.send('settings:get', ch);
+    }),
 
-  // ===== Agent 工具（Day 2 上午实现） =====
-  // execute: (tool: string, params: unknown): Promise<AgentResult> =>
-  //   ipcRenderer.invoke('agent:execute', tool, params),
+  saveSettings: (settings: any): Promise<any> =>
+    new Promise((resolve) => {
+      const ch = 'ss-' + Date.now();
+      ipcRenderer.once(ch, (_e, r) => { console.log('>>> preload received reply:', JSON.stringify(r)?.slice(0, 80)); resolve(r); });
+      ipcRenderer.send('settings:save', ch, settings);
+    }),
 
-  // ===== 用户画像（Day 2 上午实现） =====
-  // getProfile: (): Promise<UserProfile> =>
-  //   ipcRenderer.invoke('profile:get'),
-  // updateProfile: (updates: Partial<UserProfile>): Promise<void> =>
-  //   ipcRenderer.invoke('profile:update', updates),
+  sendMessage: (text: string, imageBase64?: string): Promise<string> =>
+    new Promise((resolve) => {
+      const result = ipcRenderer.sendSync('ai-chat', { text, imageBase64 });
+      resolve(result || '');
+    }),
 
-  /** 监听主进程事件 */
-  on: (channel: string, callback: (...args: unknown[]) => void): void => {
-    const validChannels = ['cat:stateChange', 'cat:error'];
-    if (validChannels.includes(channel)) {
-      ipcRenderer.on(channel, (_event, ...args) => callback(...args));
-    }
+  onStreamToken: (cb: (token: string) => void): void => {
+    ipcRenderer.on('ai:streamToken', (_e, t) => cb(t));
+  },
+  onStreamEnd: (cb: () => void): void => {
+    ipcRenderer.on('ai:streamEnd', () => cb());
+  },
+  onStreamError: (cb: (err: any) => void): void => {
+    ipcRenderer.on('ai:streamError', (_e, err) => cb(err));
   },
 
-  /** 移除监听 */
-  removeAllListeners: (channel: string): void => {
-    ipcRenderer.removeAllListeners(channel);
+  removeAllListeners: (ch: string): void => {
+    ipcRenderer.removeAllListeners(ch);
   },
 };
 
 contextBridge.exposeInMainWorld('pixelcat', pixelcatAPI);
-
-// 类型声明（渲染进程用 JSDoc 引用）
-export type PixelCatAPI = typeof pixelcatAPI;

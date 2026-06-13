@@ -1,29 +1,16 @@
-/**
- * IPC 处理器注册
- * 
- * 所有 Renderer → Main 的通信通过这里
- * 使用 ipcMain.handle 实现请求-响应模式
- */
-
 import { ipcMain, BrowserWindow } from 'electron';
 import { createLogger } from './infra/logger';
+import { loadSettings, saveSettings } from './settings-store';
 
 const logger = createLogger('ipc');
 
-export interface IPCContext {
-  // 后续各模块会在这里添加自己的 handler
-}
-
-/** 初始化所有 IPC 处理器 */
-export function registerIPCHandlers(ctx: IPCContext): void {
+export function registerIPCHandlers() {
   logger.info('Registering IPC handlers');
 
-  // 健康检查
-  ipcMain.handle('ping', () => {
-    return { pong: true, ts: Date.now() };
+  ipcMain.on('ping', (event, replyChannel: string) => {
+    event.reply(replyChannel, { pong: true, ts: Date.now() });
   });
 
-  // 窗口拖拽
   ipcMain.on('window:move', (event, dx: number, dy: number) => {
     const win = BrowserWindow.fromWebContents(event.sender);
     if (win) {
@@ -32,15 +19,27 @@ export function registerIPCHandlers(ctx: IPCContext): void {
     }
   });
 
-  // TODO: AI 对话处理器（Day 1 下午）
-  // ipcMain.handle('ai:sendMessage', async (_, text: string, imageBase64?: string) => { ... });
+  ipcMain.on('settings:get', (event, replyChannel: string) => {
+    try { event.reply(replyChannel, loadSettings()); }
+    catch(e: any) { event.reply(replyChannel, {}); }
+  });
 
-  // TODO: Agent 执行处理器（Day 2 上午）
-  // ipcMain.handle('agent:execute', async (_, tool: string, params: unknown) => { ... });
+  ipcMain.on('settings:save', (event, replyChannel: string, settings: any) => {
+    try {
+      saveSettings(settings);
+      event.reply(replyChannel, { ok: true });
+    } catch(e: any) {
+      event.reply(replyChannel, { ok: false, error: e.message });
+    }
+  });
 
-  // TODO: 画像处理器（Day 2 上午）
-  // ipcMain.handle('profile:get', async () => { ... });
-  // ipcMain.handle('profile:update', async (_, updates: unknown) => { ... });
+  ipcMain.on('nls:getToken', (event, replyChannel: string) => {
+    event.reply(replyChannel, {
+      appKey: process.env.NLS_APP_KEY || '',
+      url: 'wss://nls-gateway.cn-shanghai.aliyuncs.com/ws/v1',
+    });
+  });
 
+    // AI moved to renderer
   logger.info('IPC handlers registered');
 }
