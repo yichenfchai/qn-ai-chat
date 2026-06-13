@@ -28,10 +28,10 @@
     #pet { position: relative; pointer-events: auto; cursor: pointer; }
     #pet-img { display: block; width: 100px; height: auto; }
     #speech-bubble {
-      position: absolute; top: 40px; right: 20px;
+      position: absolute; top: 0; left: 110%;
       background: rgba(255,255,255,0.93); color: #333;
       padding: 10px 14px; border-radius: 14px; font-size: 13px;
-      max-width: 200px; min-width: 60px; text-align: left;
+      max-width: 300px; min-width: 100px; text-align: left;
       opacity: 0; transition: opacity 0.3s ease; pointer-events: none;
       font-family: 'Microsoft YaHei', sans-serif; line-height: 1.5;
       box-shadow: 0 3px 10px rgba(0,0,0,0.12); z-index: 5;
@@ -80,11 +80,13 @@
     #ctx-menu-item:hover { background: #444; }
     /* 文字输入 */
     #text-input-area {
-      position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+      position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+      margin-top: 8px;
       display: none; z-index: 200;
     }
     #text-input {
-      padding: 6px 10px; border-radius: 12px; border: 1px solid #ccc;
+      padding: 8px 12px; border-radius: 12px; border: 2px solid #4fc3f7;
+      background: rgba(0,0,0,0.8); color: #fff;
       font-size: 13px; width: 180px; outline: none;
       font-family: 'Microsoft YaHei', sans-serif;
     }
@@ -96,8 +98,12 @@
     <div id="drag-handle" title="拖拽移动"></div>
 
     <div id="pet">
+      <div id="speech-bubble"></div>
       <img id="pet-img" src="sprites/cat.png" alt="pet">
       <div id="hint">空格说话 / 双击打字</div>
+      <div id="text-input-area">
+        <input id="text-input" type="text" placeholder="想说什么..." autocomplete="off">
+      </div>
     </div>
 
     <div id="status-indicator"></div>
@@ -124,10 +130,13 @@
 
   </div>
 
-  <script src="js/state-machine.js"></script>
-  <script src="js/sprite-animator.js"></script>
-  <script src="js/media-capture.js"></script>
-  <script src="js/settings.js"></script>
+  <script src="js/state.js"></script>
+  <script src="js/core/api.js"></script>
+  <script src="js/core/media.js"></script>
+  <script src="js/core/tts.js"></script>
+  <script src="js/ui/bubble.js"></script>
+  <script src="js/ui/settings.js"></script>
+  <script src="js/ui/sprite.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
