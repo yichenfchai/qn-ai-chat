@@ -36,6 +36,30 @@ const pixelcatAPI = {
 
   openApp: (name: string): Promise<string> =>
     ipcRenderer.invoke('tool:openApp', name),
+
+  // ── Agent 工具执行桥接 ──
+  getTools: (): Promise<Array<unknown>> =>
+    new Promise((resolve) => {
+      const ch = 'ag-' + Date.now();
+      ipcRenderer.once(ch, (_e, r) => { resolve(r.tools || []); });
+      ipcRenderer.send('agent:getTools', ch);
+    }),
+
+  executeTool: (callId: string, name: string, args: Record<string, unknown>): Promise<{
+    status: 'success' | 'error';
+    output?: string;
+    error?: string;
+    code?: string;
+  }> =>
+    new Promise((resolve) => {
+      const replyChannel = 'agent:result:' + callId;
+      ipcRenderer.once(replyChannel, (_e, r) => { resolve(r); });
+      ipcRenderer.send('agent:execute', replyChannel, {
+        callId,
+        name,
+        arguments: args,
+      });
+    }),
 };
 
 contextBridge.exposeInMainWorld('pixelcat', pixelcatAPI);
