@@ -50,6 +50,11 @@ const Settings = {
     });
 
     // 关闭
+    document.getElementById('ctx-menu-close').addEventListener('click', () => {
+      this._menu.style.display = 'none';
+      window.close();
+    });
+
     document.getElementById('settings-close').addEventListener('click', () => {
       this._panel.style.display = 'none';
     });
