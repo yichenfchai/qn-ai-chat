@@ -11,7 +11,7 @@ import { createLogger } from './infra/logger';
 
 const logger = createLogger('window');
 
-const WINDOW_WIDTH = 410;
+const WINDOW_WIDTH = 300;
 const WINDOW_HEIGHT = 280;
 
 let mainWindow: BrowserWindow | null = null;
@@ -36,38 +36,32 @@ export function createMainWindow(): BrowserWindow {
     height: WINDOW_HEIGHT,
     x,
     y,
-    transparent: true,     // 透明背景
-    frame: false,          // 无边框
-    alwaysOnTop: true,     // 置顶
+    transparent: true,
+    frame: false,
+    alwaysOnTop: true,
     resizable: false,
-    skipTaskbar: true,     // 不显示在任务栏
-    hasShadow: false,      // 透明窗口不需要阴影
-    backgroundColor: '#00000000', // 完全透明
+    skipTaskbar: true,
+    hasShadow: false,
+    backgroundColor: '#01000000',
 
     webPreferences: {
-      contextIsolation: true,     // ⚠️ 渲染器隔离
-      nodeIntegration: false,    // ⚠️ 禁止渲染器使用 Node
-      sandbox: false,  // disabled for IPC debug             // ⚠️ 沙箱模式
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
       preload: path.join(__dirname, '../../preload/index.js'),
     },
   });
 
+  // 确保捕获鼠标事件（透明窗口在 Windows 上可能穿透）
+  mainWindow.setIgnoreMouseEvents(false);
+
   // 加载渲染器
   mainWindow.loadFile(path.join(__dirname, '../../../renderer/index.html'));
-
-  // 开发时打开 DevTools
-  if (process.env.NODE_ENV === 'development') {
-    mainWindow.webContents.openDevTools({ mode: 'detach' });
-  }
 
   mainWindow.on('closed', () => {
     mainWindow = null;
     logger.info('Window closed');
   });
-
-  // 让窗口可以被鼠标穿透（点击穿透到下面的应用）
-  // 暂时注释，因为会影响交互
-  // mainWindow.setIgnoreMouseEvents(true, { forward: true });
 
   return mainWindow;
 }
