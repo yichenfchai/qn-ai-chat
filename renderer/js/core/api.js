@@ -153,4 +153,83 @@ const AI = {
     this._abortCtrl = null;
     return full;
   },
+
+  /** 流式调用 AI（支持 Function Calling）— 给 Agent 用 */
+  async streamWithTools({ messages, tools, signal }) {
+    if (!this._key) throw new Error('API Key 未配置');
+    this.abort();
+    this._abortCtrl = new AbortController();
+
+    const body = { model: 'qwen3.5-omni-plus', messages };
+    if (tools && tools.length > 0) { body.tools = tools; body.tool_choice = 'auto'; }
+
+    const resp = await fetch(
+      'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions',
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + this._key,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ ...body, modalities: ['text'], stream: true }),
+        signal: signal || this._abortCtrl.signal,
+      }
+    );
+
+    if (!resp.ok) {
+      const errText = await resp.text().catch(() => '');
+      throw new Error('API ' + resp.status + ': ' + (errText.slice(0, 200) || 'unknown'));
+    }
+
+    return this._parseSSE(resp.body);
+  },
+
+  /** 解析 SSE 流 → {text, toolCalls} */
+  async _parseSSE(stream) {
+    const reader = stream.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '', finalText = '';
+    const toolCallMap = new Map();
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+      for (const line of lines) {
+        const t = line.trim();
+        if (!t.startsWith('data: ')) continue;
+        const d = t.slice(6);
+        if (d === '[DONE]') break;
+        try {
+          const delta = JSON.parse(d)?.choices?.[0]?.delta;
+          if (!delta) continue;
+          if (delta.content) finalText += delta.content;
+          if (delta.tool_calls) {
+            for (const tc of delta.tool_calls) {
+              const idx = tc.index;
+              if (!toolCallMap.has(idx)) toolCallMap.set(idx, { id: '', name: '', args: '' });
+              const entry = toolCallMap.get(idx);
+              if (tc.id) entry.id = tc.id;
+              if (tc.function?.name) entry.name += tc.function.name;
+              if (tc.function?.arguments) entry.args += tc.function.arguments;
+            }
+          }
+        } catch {}
+      }
+    }
+    const toolCalls = [];
+    for (const [idx, entry] of toolCallMap) {
+      if (!entry.name) continue;
+      try {
+        const parsedArgs = JSON.parse(entry.args);
+        toolCalls.push({ id: entry.id || 'call_' + idx, type: 'function', function: { name: entry.name, arguments: JSON.stringify(parsedArgs) }, _name: entry.name, _args: parsedArgs });
+      } catch {
+        toolCalls.push({ id: entry.id || 'call_' + idx, type: 'function', function: { name: entry.name, arguments: entry.args }, _name: entry.name, _args: { _raw: entry.args } });
+      }
+    }
+    return { text: finalText, toolCalls: toolCalls.length > 0 ? toolCalls : null };
+  },
+
 };
