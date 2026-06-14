@@ -4,7 +4,7 @@
 
 ## Demo 视频
 
-> 📺 [Demo 视频链接] — 请替换为你的 Bilibili/云盘链接
+> 📺 [[Demo 视频链接]  https://www.bilibili.com/video/BV1CGJN6MEtD/
 
 ---
 
